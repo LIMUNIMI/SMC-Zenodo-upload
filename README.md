@@ -138,6 +138,14 @@ In both cases, if the DOI field contains `*`, split at the `*` to get:
 
 The `--title` option is especially handy when working with translated papers, because we can add also the translated title to the bibtex (useful only for displaying the translated papers on nime.org).
 
+## Tests
+
+Tests use the standard `unittest` module and never contact Zenodo:
+
+```bash
+poetry run python -m unittest discover -s tests -t .
+```
+
 ## Conference Metadata
 
 Some of the conference metadata is still hardcoded in the file, look inside `nime_zenodo_upload/__main__.py` and update the lines:

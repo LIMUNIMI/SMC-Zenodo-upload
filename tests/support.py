@@ -1,0 +1,283 @@
+"""Shared helpers for the test suite.
+
+Tests never touch the network: ``requests.get``/``requests.post`` are replaced by
+:class:`FakeZenodo`. Each test runs in a temporary working directory because the
+program resolves ``./upload/``, ``secrets.toml`` and ``nime_dois.txt`` relative to
+the CWD.
+"""
+
+import importlib
+import json
+import os
+import re
+import shutil
+import sys
+import tempfile
+import unittest
+import urllib.parse
+from unittest import mock
+
+from click.testing import CliRunner
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FIXTURES_DIR = os.path.join(REPO_ROOT, 'tests', 'fixtures')
+MODULE_NAME = 'nime_zenodo_upload.__main__'
+
+# Absolute path: the CWD changes during tests, so '' in sys.path would break.
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
+MB = 1024 * 1024
+PUBLIC_TOKEN = 'PUB-TOKEN'
+SANDBOX_TOKEN = 'SBX-TOKEN'
+
+
+class FakeResponse:
+    """Minimal stand-in for requests.Response."""
+
+    def __init__(self, status_code=200, payload=None, text=None):
+        self.status_code = status_code
+        self._payload = payload
+        if text is not None:
+            self.text = text
+        else:
+            self.text = json.dumps(payload) if payload is not None else ''
+
+    def json(self):
+        if self._payload is None:
+            raise ValueError('response is not JSON')
+        return self._payload
+
+
+class FakeZenodo:
+    """Records calls and answers like the Zenodo deposit API.
+
+    ``fail_create``/``fail_publish``/``fail_pdf`` take a status code (or a
+    ``FakeResponse``) and apply to every deposition; ``fail_files`` maps an
+    uploaded filename to a status code (or ``FakeResponse``).
+    """
+
+    def __init__(self):
+        self.calls = []
+        self.fail_create = None
+        self.fail_publish = None
+        self.fail_pdf = None
+        self.fail_files = {}
+        self.fail_titles = set()
+        self._next_id = 1000
+        self._current_id = None
+        self.uploaded = []  # (deposition_id, filename)
+
+    # -- helpers -----------------------------------------------------------
+    @staticmethod
+    def _as_response(spec, default_payload=None):
+        if isinstance(spec, FakeResponse):
+            return spec
+        return FakeResponse(spec, {'message': 'error'})
+
+    def doi_for(self, deposition_id):
+        return f'10.5281/zenodo.{deposition_id}'
+
+    def calls_to(self, suffix):
+        return [c for c in self.calls if c['url'].split('?')[0].endswith(suffix)]
+
+    # -- patched entry points ------------------------------------------------
+    def get(self, url, params=None, **kwargs):
+        self.calls.append({'method': 'GET', 'url': url, 'params': params})
+        path = url.split('?')[0]
+        if path.endswith('/api/deposit/depositions'):
+            return FakeResponse(200, [])
+        deposition_id = int(path.rsplit('/', 1)[-1])
+        return FakeResponse(200, {'id': deposition_id, 'doi': self.doi_for(deposition_id)})
+
+    def post(self, url, params=None, json=None, headers=None, data=None, files=None, **kwargs):
+        record = {
+            'method': 'POST', 'url': url, 'params': params, 'json': json,
+            'headers': headers, 'data': data,
+        }
+        self.calls.append(record)
+        path = url.split('?')[0]
+
+        if path.endswith('/api/deposit/depositions'):
+            if self.fail_create is not None:
+                return self._as_response(self.fail_create)
+            if json is not None and json.get('metadata', {}).get('title') in self.fail_titles:
+                return FakeResponse(400, {'message': 'bad metadata'})
+            self._current_id = self._next_id
+            self._next_id += 1
+            record['deposition_id'] = self._current_id
+            return FakeResponse(201, {'id': self._current_id})
+
+        if path.endswith('/files'):
+            filename = (data or {}).get('filename')
+            record['filename'] = filename
+            if files is not None:
+                # Read the stream like requests would, so size/handle issues surface.
+                files['file'].read(1)
+            deposition_id = int(path.split('/depositions/')[1].split('/')[0])
+            record['deposition_id'] = deposition_id
+            if filename in self.fail_files:
+                return self._as_response(self.fail_files[filename])
+            if self.fail_pdf is not None and filename.endswith('.pdf'):
+                return self._as_response(self.fail_pdf)
+            self.uploaded.append((deposition_id, filename))
+            return FakeResponse(201, {'filename': filename})
+
+        if path.endswith('/actions/publish'):
+            record['deposition_id'] = int(path.split('/depositions/')[1].split('/')[0])
+            if self.fail_publish is not None:
+                return self._as_response(self.fail_publish)
+            return FakeResponse(202, {'id': record['deposition_id']})
+
+        raise AssertionError(f'Unexpected POST to {url}')
+
+
+def bib_entry(key='nime2025_1', title='A Title', authors='Doe, Jane', year='2025',
+              url=None, **fields):
+    """Build a BibTeX entry string. ``None`` values omit the field.
+
+    Field names are case-sensitive for the program (``Url``, ``Title``,
+    ``Address``, ``Pages``, ``Abstract`` capitalised; the rest lowercase).
+    """
+    if url is None:
+        url = f'https://nime.org/proceedings/{year}/{key}.pdf'
+    values = {'Title': title, 'Url': url}
+    if authors is not None:
+        values['author'] = authors
+    values.update(fields)
+    body = ',\n'.join(
+        f'  {name} = {{{value}}}' for name, value in values.items() if value is not None
+    )
+    return f'@inproceedings{{{key},\n{body}\n}}\n'
+
+
+class WorkspaceTestCase(unittest.TestCase):
+    """Runs each test inside a temp dir containing ``upload/`` and ``secrets.toml``.
+
+    The program module is imported fresh for every test (it has import-time side
+    effects) and exposed as ``self.app``. If the refactoring changes how the
+    program is loaded, this class is the only place to adapt.
+    """
+
+    write_secrets = True
+
+    def setUp(self):
+        self._old_cwd = os.getcwd()
+        self._old_module = sys.modules.pop(MODULE_NAME, None)
+        self.tmp = tempfile.mkdtemp(prefix='nime_test_')
+        os.chdir(self.tmp)
+        os.mkdir('upload')
+        if self.write_secrets:
+            with open('secrets.toml', 'w') as f:
+                f.write(f"PUBLIC_TOKEN = '{PUBLIC_TOKEN}'\nSANDBOX_TOKEN = '{SANDBOX_TOKEN}'\n")
+
+        self.fake = FakeZenodo()
+        for name, target in (('get', self.fake.get), ('post', self.fake.post)):
+            patcher = mock.patch(f'requests.{name}', side_effect=target)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        if self.write_secrets:
+            self.app = importlib.import_module(MODULE_NAME)
+        self.runner = CliRunner()
+
+    def tearDown(self):
+        os.chdir(self._old_cwd)
+        sys.modules.pop(MODULE_NAME, None)
+        if self._old_module is not None:
+            sys.modules[MODULE_NAME] = self._old_module
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def reload_app(self):
+        """Import the program again, as a new process would see it."""
+        sys.modules.pop(MODULE_NAME, None)
+        self.app = importlib.import_module(MODULE_NAME)
+
+    # -- file helpers ---------------------------------------------------------
+    def write_bib(self, *entries, name='test.bib'):
+        path = os.path.join('upload', name)
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(entries))
+        return path
+
+    def make_file(self, name, content=b'%PDF-1.4 test'):
+        with open(os.path.join('upload', name), 'wb') as f:
+            f.write(content)
+
+    def copy_fixture(self, name):
+        """Copy tests/fixtures/<name> into upload/ and create the PDF its url names.
+
+        Returns the path of the copied .bib file.
+        """
+        dest = os.path.join('upload', name)
+        shutil.copy(os.path.join(FIXTURES_DIR, name), dest)
+        with open(dest, encoding='utf-8') as f:
+            for url in re.findall(r'^\s*url\s*=\s*\{([^}]*)\}', f.read(), re.M | re.I):
+                self.make_file(url.rsplit('/', 1)[-1])
+        return dest
+
+    def make_pdf(self, key='nime2025_1'):
+        self.make_file(f'{key}.pdf')
+
+    def read_dois(self):
+        with open('nime_dois.txt', encoding='utf-8') as f:
+            return f.read().splitlines()
+
+    def doi_lines(self):
+        """Lines of nime_dois.txt excluding the 'Uploaded ...' header lines."""
+        return [line for line in self.read_dois() if not line.startswith('Uploaded ')]
+
+    # -- inspection helpers -------------------------------------------------------
+    def created_depositions(self):
+        """JSON bodies of every deposition-creation request, in order."""
+        return [
+            c['json'] for c in self.fake.calls
+            if c['method'] == 'POST' and c['url'].split('?')[0].endswith('/api/deposit/depositions')
+        ]
+
+    def created_metadata(self):
+        return [body['metadata'] for body in self.created_depositions()]
+
+    def call_summary(self):
+        """Compact (method, endpoint) list: 'list', 'create', 'file', 'publish', 'get'."""
+        names = []
+        for c in self.fake.calls:
+            path = c['url'].split('?')[0]
+            if path.endswith('/files'):
+                names.append((c['method'], 'file'))
+            elif path.endswith('/actions/publish'):
+                names.append((c['method'], 'publish'))
+            elif path.endswith('/api/deposit/depositions'):
+                names.append((c['method'], 'list' if c['method'] == 'GET' else 'create'))
+            else:
+                names.append((c['method'], 'get'))
+        return names
+
+    @staticmethod
+    def call_token(call):
+        """Access token of a recorded call (query param or part of the URL)."""
+        if call.get('params') and 'access_token' in call['params']:
+            return call['params']['access_token']
+        query = urllib.parse.urlparse(call['url']).query
+        return urllib.parse.parse_qs(query)['access_token'][0]
+
+    # -- invocation helpers -----------------------------------------------------
+    def run_upload(self, bib_path, *args):
+        with mock.patch('builtins.input', return_value=''):
+            return self.runner.invoke(self.app.upload, [bib_path, *args])
+
+    def run_check(self, bib_path, *args):
+        return self.runner.invoke(self.app.check, [bib_path, *args])
+
+
+def fake_sizes(sizes):
+    """Return an os.path.getsize replacement reporting ``sizes[basename]`` bytes.
+
+    Avoids creating 100 MB files; other files report their real size.
+    """
+    real = os.path.getsize
+
+    def fake(path):
+        return sizes.get(os.path.basename(str(path)), None) or real(path)
+
+    return fake
