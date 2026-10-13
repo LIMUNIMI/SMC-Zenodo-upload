@@ -6,7 +6,9 @@ program resolves ``./upload/``, ``secrets.toml``, ``conference.toml`` and
 ``nime_dois.txt`` relative to the CWD.
 """
 
+import contextlib
 import importlib
+import io
 import json
 import os
 import re
@@ -16,8 +18,6 @@ import tempfile
 import unittest
 import urllib.parse
 from unittest import mock
-
-from click.testing import CliRunner
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES_DIR = os.path.join(REPO_ROOT, 'tests', 'fixtures')
@@ -36,6 +36,15 @@ CONFERENCE_TOML = (
     "CONFERENCE_TITLE = 'International Conference on New Interfaces for Musical Expression'\n"
     "CONFERENCE_ACRONYM = 'NIME'\n"
 )
+
+
+class CliResult:
+    """Outcome of a CLI invocation: exit code, captured stdout and raised exception."""
+
+    def __init__(self, exit_code, output, exception=None):
+        self.exit_code = exit_code
+        self.output = output
+        self.exception = exception
 
 
 class FakeResponse:
@@ -189,7 +198,6 @@ class WorkspaceTestCase(unittest.TestCase):
 
         if self.write_secrets and self.write_conference:
             self.app = importlib.import_module(MODULE_NAME)
-        self.runner = CliRunner()
 
     def tearDown(self):
         os.chdir(self._old_cwd)
@@ -272,12 +280,25 @@ class WorkspaceTestCase(unittest.TestCase):
         return urllib.parse.parse_qs(query)['access_token'][0]
 
     # -- invocation helpers -----------------------------------------------------
+    def run_cli(self, *argv):
+        """Run ``main(argv)`` in-process; unexpected exceptions give exit code 1."""
+        out = io.StringIO()
+        exit_code, exception = 0, None
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+            try:
+                self.app.main(list(argv))
+            except SystemExit as e:
+                exit_code = e.code if isinstance(e.code, int) else 1
+            except (Exception, KeyboardInterrupt) as e:
+                exit_code, exception = 1, e
+        return CliResult(exit_code, out.getvalue(), exception)
+
     def run_upload(self, bib_path, *args):
         with mock.patch('builtins.input', return_value=''):
-            return self.runner.invoke(self.app.upload, [bib_path, *args])
+            return self.run_cli('upload', bib_path, *args)
 
     def run_check(self, bib_path, *args):
-        return self.runner.invoke(self.app.check, [bib_path, *args])
+        return self.run_cli('check', bib_path, *args)
 
 
 def fake_sizes(sizes):

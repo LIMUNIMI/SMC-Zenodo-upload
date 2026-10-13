@@ -24,7 +24,7 @@ class TestUploadCommand(WorkspaceTestCase):
 
     def test_user_must_confirm_with_enter_before_upload(self):
         with mock.patch('builtins.input', side_effect=KeyboardInterrupt) as prompt:
-            result = self.runner.invoke(self.app.upload, [self.bib])
+            result = self.run_cli('upload', self.bib)
 
         prompt.assert_called_once()
         self.assertEqual(self.fake.calls, [])
@@ -36,7 +36,7 @@ class TestUploadCommand(WorkspaceTestCase):
             bib_entry(key='nime2025_1'), bib_entry(key='nime2025_2'), name='two.bib'
         )
         with mock.patch('builtins.input', return_value='') as prompt:
-            self.runner.invoke(self.app.upload, [bib])
+            self.run_cli('upload', bib)
 
         prompt.assert_called_once()
 
@@ -62,7 +62,7 @@ class TestCheckCommandOptions(WorkspaceTestCase):
         self.make_pdf()
         bib = self.write_bib(bib_entry())
         with mock.patch('builtins.input') as prompt:
-            result = self.runner.invoke(self.app.check, [bib])
+            result = self.run_cli('check', bib)
 
         self.assertEqual(result.exit_code, 0, result.output)
         prompt.assert_not_called()

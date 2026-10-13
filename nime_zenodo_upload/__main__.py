@@ -31,9 +31,10 @@ Zenodo displays files alphabetically in its UI.
 
 import json
 import requests
+import argparse
 import datetime
-import click
 import os
+import sys
 import tomllib
 import pprint
 
@@ -68,14 +69,27 @@ with open("secrets.toml", "rb") as f:
     secret_data = tomllib.load(f)
 
 
+ANSI_COLORS = {'red': 31, 'green': 32, 'yellow': 33}
+if os.name == 'nt' and sys.stdout.isatty():
+    os.system('')  # enables ANSI escape sequences in the Windows console
+
+
+def secho(message, fg=None):
+    """Print a message, coloured when writing to a terminal."""
+    if fg in ANSI_COLORS and sys.stdout.isatty():
+        print(f"\033[{ANSI_COLORS[fg]}m{message}\033[0m")
+    else:
+        print(message)
+
+
 def _print_response_json_or_text(resp, color='red'):
     """Helper to print a requests.Response as JSON if possible, otherwise as raw text."""
     try:
         data = resp.json()
-        click.secho(data, fg=color)
+        secho(data, fg=color)
     except ValueError:
         # Not JSON (e.g., HTML 413 page); print raw text
-        click.secho(resp.text, fg=color)
+        secho(resp.text, fg=color)
 
 
 def upload_to_zenodo(metadata, pdf_path, production_zenodo=False, add_title=False):
@@ -98,10 +112,10 @@ def upload_to_zenodo(metadata, pdf_path, production_zenodo=False, add_title=Fals
     # Track supplementary files that were too large or otherwise skipped
     skipped_supplementary = []
 
-    click.secho(f"Starting new upload for: {pdf_path} to {ZENODO_URL}", fg='yellow')
+    secho(f"Starting new upload for: {pdf_path} to {ZENODO_URL}", fg='yellow')
     url = ZENODO_URL + '/api/deposit/depositions'
     access_depositions = requests.get(url, params={'access_token': TOKEN})
-    click.secho(f"Access depositions: {access_depositions.status_code}", fg='yellow')
+    secho(f"Access depositions: {access_depositions.status_code}", fg='yellow')
 
     # Create new paper submission - add parsed metadata
     headers = {"Content-Type": "application/json"}
@@ -114,7 +128,7 @@ def upload_to_zenodo(metadata, pdf_path, production_zenodo=False, add_title=Fals
 
     # If creation of new deposition is unsuccessful, abort
     if new_deposition.status_code > 210:
-        click.secho(
+        secho(
             f"Error happened during submission {pdf_path}, status code: "
             f"{new_deposition.status_code}",
             fg='red'
@@ -139,7 +153,7 @@ def upload_to_zenodo(metadata, pdf_path, production_zenodo=False, add_title=Fals
 
     # If upload of file is unsuccessful, abort
     if add_file.status_code > 210:
-        click.secho(
+        secho(
             f"Error happened during file upload of {pdf_path}, status code: "
             f"{add_file.status_code}",
             fg='red'
@@ -161,20 +175,20 @@ def upload_to_zenodo(metadata, pdf_path, production_zenodo=False, add_title=Fals
 
         # Pre-check size: skip if over MAX_SUPP_BYTES
         if file_size > MAX_SUPP_BYTES:
-            click.secho(
+            secho(
                 f"Skipping supplementary file {extra_file_path} "
                 f"({file_size / (1024 * 1024):.1f} MB) – above automatic upload limit "
                 f"({MAX_SUPP_BYTES / (1024 * 1024):.0f} MB).",
                 fg='yellow'
             )
-            click.secho(
+            secho(
                 "Upload this file manually via the Zenodo web UI and attach it to the deposition.",
                 fg='yellow'
             )
             skipped_supplementary.append(extra_file_path)
             continue
 
-        click.secho(
+        secho(
             f"Starting upload for supplementary file: {extra_file_path} to {ZENODO_URL}",
             fg='yellow'
         )
@@ -184,14 +198,14 @@ def upload_to_zenodo(metadata, pdf_path, production_zenodo=False, add_title=Fals
 
         # If upload of file is unsuccessful, warn and continue
         if add_file.status_code > 210:
-            click.secho(
+            secho(
                 f"Error happened during supplementary file upload of {extra_file_path}, "
                 f"status code: {add_file.status_code}",
                 fg='red'
             )
 
             if add_file.status_code == 413:
-                click.secho(
+                secho(
                     "Server reports the file is too large (HTTP 413). "
                     "You must upload this file manually via the Zenodo web UI.",
                     fg='red'
@@ -202,7 +216,7 @@ def upload_to_zenodo(metadata, pdf_path, production_zenodo=False, add_title=Fals
             # Do not abort the whole deposition; continue with other files
             continue
 
-    click.secho(f"{pdf_path} submitted with ID {submission_id}", fg='green')
+    secho(f"{pdf_path} submitted with ID {submission_id}", fg='green')
 
     # publish the new deposition
     publish_record = requests.post(
@@ -212,13 +226,13 @@ def upload_to_zenodo(metadata, pdf_path, production_zenodo=False, add_title=Fals
 
     # If publish unsuccessful, abort
     if publish_record.status_code > 210:
-        click.secho(
+        secho(
             f"Error happened during publish, status code: {publish_record.status_code}",
             fg='red'
         )
         _print_response_json_or_text(publish_record, color='red')
         return
-    click.secho(f"{pdf_path} PUBLISHED with ID {submission_id}", fg='green')
+    secho(f"{pdf_path} PUBLISHED with ID {submission_id}", fg='green')
 
     # get back the deposition to confirm the DOI
     retrieved_deposition = requests.get(
@@ -226,7 +240,7 @@ def upload_to_zenodo(metadata, pdf_path, production_zenodo=False, add_title=Fals
         params={'access_token': TOKEN}
     )
     retrieved_doi = retrieved_deposition.json()['doi']
-    click.secho(f"{pdf_path} confirmed DOI is {retrieved_doi}", fg='green')
+    secho(f"{pdf_path} confirmed DOI is {retrieved_doi}", fg='green')
 
     # If any supplementary files were skipped, mark DOI and record filenames.
     # We use ';' as separator for multiple filenames so the line remains valid CSV.
@@ -234,7 +248,7 @@ def upload_to_zenodo(metadata, pdf_path, production_zenodo=False, add_title=Fals
     if skipped_supplementary:
         skipped_list = ';'.join(skipped_supplementary)
         doi_field = f"{retrieved_doi}*{skipped_list}"
-        click.secho(
+        secho(
             f"Supplementary files skipped for {pdf_path}: {skipped_list}. "
             f"Marked DOI as {doi_field} in {DOI_FILENAME}.",
             fg='yellow'
@@ -295,13 +309,13 @@ def format_metadata(
                 continue
 
         if missing_pdfs:
-            click.secho(
+            secho(
                 "The following PDFs referenced in the .bib file do not exist in the upload folder:",
                 fg='red'
             )
             for name in sorted(set(missing_pdfs)):
-                click.secho(f"  - {name}", fg='red')
-            click.secho(
+                secho(f"  - {name}", fg='red')
+            secho(
                 "Fix the missing files before running the upload.",
                 fg='red'
             )
@@ -309,21 +323,21 @@ def format_metadata(
             return
 
         if oversized_pdfs:
-            click.secho(
+            secho(
                 "One or more PDFs are larger than 100 MB and will fail to upload:",
                 fg='red'
             )
             for name, size in sorted(set(oversized_pdfs)):
-                click.secho(
+                secho(
                     f"  - {name}: {size / (1024 * 1024):.1f} MB",
                     fg='red'
                 )
-            click.secho(
+            secho(
                 "Zenodo rejects these large PDF uploads (HTTP 413). "
                 "Please compress or split these PDFs to be under 100 MB and try again.",
                 fg='red'
             )
-            click.secho(
+            secho(
                 "Aborting before starting any uploads. No Zenodo records were created.",
                 fg='red'
             )
@@ -357,7 +371,7 @@ def format_metadata(
             pdf_name = conf_url.rsplit('/', 1)[-1]
 
             if not os.path.exists(UPLOAD_FOLDER + pdf_name):
-                click.secho(f'PDF: {pdf_name} does not exist in the upload folder!', fg='red')
+                secho(f'PDF: {pdf_name} does not exist in the upload folder!', fg='red')
                 raise Exception(f'The PDF {pdf_name} did not exist in the upload folder.')
 
             title = b['Title']
@@ -429,25 +443,16 @@ def format_metadata(
             raise
 
 
-@click.command()
-@click.argument('bibfile', type=click.Path(exists=True))
-@click.option('--production', is_flag=True)
-@click.option(
-    '--title',
-    'include_title',
-    is_flag=True,
-    help='Also append the paper title as the last field in nime_dois.txt'
-)
 def upload(bibfile, production, include_title):
     """Process metadata from a .bibtex file and upload to Zenodo."""
     if production:
-        click.secho(
+        secho(
             "WARNING! You are uploading to the production Zenodo server! "
             "Make sure you are ready! Cancel if not!",
             fg="red"
         )
     else:
-        click.secho(
+        secho(
             "You are uploading to the sandbox Zenodo server! Test here as much as you want.",
             fg="green"
         )
@@ -462,9 +467,6 @@ def upload(bibfile, production, include_title):
     )
 
 
-@click.command()
-@click.argument('bibfile', type=click.Path(exists=True))
-@click.option('--authors', is_flag=True)
 def check(bibfile, authors):
     """Process metadata from a .bibtex file and print out to check it."""
     if authors:
@@ -487,12 +489,40 @@ def check(bibfile, authors):
         )
 
 
-@click.group()
-def cli():
-    pass
+def existing_file(path):
+    if not os.path.exists(path):
+        raise argparse.ArgumentTypeError(f"path '{path}' does not exist")
+    return path
+
+
+def main(argv=None):
+    cli = argparse.ArgumentParser(prog='nime_zenodo_upload')
+    commands = cli.add_subparsers(dest='command', required=True)
+
+    upload_cmd = commands.add_parser(
+        'upload', help='Process metadata from a .bibtex file and upload to Zenodo.'
+    )
+    upload_cmd.add_argument('bibfile', type=existing_file)
+    upload_cmd.add_argument('--production', action='store_true')
+    upload_cmd.add_argument(
+        '--title',
+        dest='include_title',
+        action='store_true',
+        help='Also append the paper title as the last field in nime_dois.txt'
+    )
+
+    check_cmd = commands.add_parser(
+        'check', help='Process metadata from a .bibtex file and print out to check it.'
+    )
+    check_cmd.add_argument('bibfile', type=existing_file)
+    check_cmd.add_argument('--authors', action='store_true')
+
+    args = cli.parse_args(argv)
+    if args.command == 'upload':
+        upload(args.bibfile, args.production, args.include_title)
+    else:
+        check(args.bibfile, args.authors)
 
 
 if __name__ == '__main__':
-    cli.add_command(upload)
-    cli.add_command(check)
-    cli()
+    main()
