@@ -32,7 +32,6 @@ Zenodo displays files alphabetically in its UI.
 import json
 import requests
 import datetime
-#import latexcodec # TODO: remove this.
 import click
 import os
 import tomllib

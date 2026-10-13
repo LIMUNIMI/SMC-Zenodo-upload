@@ -10,7 +10,7 @@ The metadata from the .bib entries are tied to the article (.pdf file) and are p
 
 When this script is used to upload a new batch of papers the DOI and file name of each paper are added to the text file `nime_dois.txt`. Optionally (with the `--title` flag) the paper title is also appended as a final field on each line, which is especially handy when working with translated papers and multiple DOIs.
 
-This project uses [Poetry](https://python-poetry.org) to manage dependencies.
+This project requires Python 3.11 or newer; dependencies are listed in `requirements.txt`.
 
 For the proceedings chair of the conference, your workflow should be:
 
@@ -31,7 +31,9 @@ Then you can pass the `nime_dois.txt` file to the proceedings officer of NIME wh
 You can install the project by running:
 
 ```bash
-poetry install
+python -m venv .venv
+.venv\Scripts\activate        # Linux/macOS: source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
 ## Run
@@ -39,7 +41,7 @@ poetry install
 You can test run the program by running:
 
 ```bash
-poetry run python nime_zenodo_upload --help
+python nime_zenodo_upload --help
 ```
 
 To run the program you will need to:
@@ -56,13 +58,13 @@ To run the program you will need to:
 Once you have your data in place, you can view the metadata that will be created (without uploading) by running:
 
 ```bash
-poetry run python nime_zenodo_upload check upload/nime2036_music.bib
+python nime_zenodo_upload check upload/nime2036_music.bib
 ```
 
 It's a good idea to check the author names carefully as they may have been processed incorrectly:
 
 ```bash
-poetry run python nime_zenodo_upload check upload/nime2036_music.bib --authors
+python nime_zenodo_upload check upload/nime2036_music.bib --authors
 ```
 
 Typically you would run the checks many times to make sure the metadata is perfect.
@@ -70,13 +72,13 @@ Typically you would run the checks many times to make sure the metadata is perfe
 When your metadata is ready you can try uploading to the sandbox server:
 
 ```bash
-poetry run python nime_zenodo_upload upload upload/nime2023_music.bib
+python nime_zenodo_upload upload upload/nime2023_music.bib
 ```
 
 By default, the program uploads to the Zenodo sandbox. When you are **absolutely ready to commit to the production server** you can run:
 
 ```bash
-poetry run python nime_zenodo_upload upload upload/nime2023_music.bib --production
+python nime_zenodo_upload upload upload/nime2023_music.bib --production
 ```
 
 to do your final uploads.
@@ -84,7 +86,7 @@ to do your final uploads.
 You can also request that the title be written into `nime_dois.txt` alongside the DOI by adding the `--title` flag:
 
 ```bash
-poetry run python nime_zenodo_upload upload upload/nime2023_music.bib --title
+python nime_zenodo_upload upload upload/nime2023_music.bib --title
 ```
 
 This is particularly useful when you later need to associate DOIs with translated titles or multiple language versions.
@@ -143,7 +145,7 @@ The `--title` option is especially handy when working with translated papers, be
 Tests use the standard `unittest` module and never contact Zenodo:
 
 ```bash
-poetry run python -m unittest discover -s tests -t .
+python -m unittest discover -s tests -t .
 ```
 
 ## Conference Metadata
