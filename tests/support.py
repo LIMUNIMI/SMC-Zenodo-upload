@@ -2,8 +2,8 @@
 
 Tests never touch the network: ``requests.get``/``requests.post`` are replaced by
 :class:`FakeZenodo`. Each test runs in a temporary working directory because the
-program resolves ``./upload/``, ``secrets.toml`` and ``nime_dois.txt`` relative to
-the CWD.
+program resolves ``./upload/``, ``secrets.toml``, ``conference.toml`` and
+``nime_dois.txt`` relative to the CWD.
 """
 
 import importlib
@@ -30,6 +30,12 @@ if REPO_ROOT not in sys.path:
 MB = 1024 * 1024
 PUBLIC_TOKEN = 'PUB-TOKEN'
 SANDBOX_TOKEN = 'SBX-TOKEN'
+CONFERENCE_TOML = (
+    "PUBLICATION_DATE = '2026-06-23'\n"
+    "CONFERENCE_DATES = '23 June - 26 June, 2026'\n"
+    "CONFERENCE_TITLE = 'International Conference on New Interfaces for Musical Expression'\n"
+    "CONFERENCE_ACRONYM = 'NIME'\n"
+)
 
 
 class FakeResponse:
@@ -152,7 +158,7 @@ def bib_entry(key='nime2025_1', title='A Title', authors='Doe, Jane', year='2025
 
 
 class WorkspaceTestCase(unittest.TestCase):
-    """Runs each test inside a temp dir containing ``upload/`` and ``secrets.toml``.
+    """Runs each test inside a temp dir with ``upload/``, ``secrets.toml`` and ``conference.toml``.
 
     The program module is imported fresh for every test (it has import-time side
     effects) and exposed as ``self.app``. If the refactoring changes how the
@@ -160,6 +166,7 @@ class WorkspaceTestCase(unittest.TestCase):
     """
 
     write_secrets = True
+    write_conference = True
 
     def setUp(self):
         self._old_cwd = os.getcwd()
@@ -170,6 +177,9 @@ class WorkspaceTestCase(unittest.TestCase):
         if self.write_secrets:
             with open('secrets.toml', 'w') as f:
                 f.write(f"PUBLIC_TOKEN = '{PUBLIC_TOKEN}'\nSANDBOX_TOKEN = '{SANDBOX_TOKEN}'\n")
+        if self.write_conference:
+            with open('conference.toml', 'w') as f:
+                f.write(CONFERENCE_TOML)
 
         self.fake = FakeZenodo()
         for name, target in (('get', self.fake.get), ('post', self.fake.post)):
@@ -177,7 +187,7 @@ class WorkspaceTestCase(unittest.TestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
 
-        if self.write_secrets:
+        if self.write_secrets and self.write_conference:
             self.app = importlib.import_module(MODULE_NAME)
         self.runner = CliRunner()
 

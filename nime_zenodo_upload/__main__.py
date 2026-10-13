@@ -44,10 +44,14 @@ from pybtex.database.input import bibtex
 parser = bibtex.Parser()
 
 UPLOAD_FOLDER = './upload/'
-PUBLICATION_DATE = '2026-06-23'
-CONFERENCE_DATES = '23 June - 26 June, 2026'
-CONFERENCE_TITLE = 'International Conference on New Interfaces for Musical Expression'
-CONFERENCE_ACRONYM = 'NIME'
+
+# Per-edition conference metadata, edit conference.toml for each edition:
+with open("conference.toml", "rb") as f:
+    conference_data = tomllib.load(f)
+PUBLICATION_DATE = conference_data['PUBLICATION_DATE']
+CONFERENCE_DATES = conference_data['CONFERENCE_DATES']
+CONFERENCE_TITLE = conference_data['CONFERENCE_TITLE']
+CONFERENCE_ACRONYM = conference_data['CONFERENCE_ACRONYM']
 
 # Maximum size for automatic supplementary upload (100 MB)
 MAX_SUPP_BYTES = 100 * 1024 * 1024

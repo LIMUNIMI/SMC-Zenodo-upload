@@ -148,16 +148,14 @@ poetry run python -m unittest discover -s tests -t .
 
 ## Conference Metadata
 
-Some of the conference metadata is still hardcoded in the file, look inside `nime_zenodo_upload/__main__.py` and update the lines:
+The conference metadata is read from `conference.toml` in the same directory as this readme file. Update its records as needed for your edition:
 
-```python
+```toml
 PUBLICATION_DATE = '2023-05-31'
 CONFERENCE_DATES = '31 May - 3 June, 2023'
 CONFERENCE_TITLE = 'International Conference on New Interfaces for Musical Expression'
 CONFERENCE_ACRONYM = 'NIME'
 ```
-
-as needed for your edition.
 
 ## Additional files
 

@@ -8,7 +8,7 @@ from tests.support import MB, MODULE_NAME, WorkspaceTestCase, bib_entry
 
 class TestImportSideEffects(WorkspaceTestCase):
     # Characterization: the module writes to nime_dois.txt and reads
-    # secrets.toml at import time. May change in refactor.
+    # conference.toml and secrets.toml at import time. May change in refactor.
 
     def test_import_appends_upload_header_to_dois_file(self):
         lines = self.read_dois()
@@ -66,6 +66,19 @@ class TestImportWithoutSecrets(WorkspaceTestCase):
     def test_missing_secrets_file_fails_at_import(self):
         with self.assertRaises(FileNotFoundError):
             importlib.import_module(MODULE_NAME)
+
+
+class TestImportWithoutConferenceFile(WorkspaceTestCase):
+    write_conference = False
+
+    def test_missing_conference_file_fails_at_import(self):
+        with self.assertRaises(FileNotFoundError):
+            importlib.import_module(MODULE_NAME)
+
+    def test_missing_conference_file_leaves_dois_file_untouched(self):
+        with self.assertRaises(FileNotFoundError):
+            importlib.import_module(MODULE_NAME)
+        self.assertFalse(os.path.exists('nime_dois.txt'))
 
 
 class TestConfiguration(WorkspaceTestCase):
