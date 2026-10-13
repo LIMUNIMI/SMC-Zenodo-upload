@@ -87,11 +87,15 @@ class TestInvalidCsv(WorkspaceTestCase):
             csv_row(key='nime2025_3'),
         )
 
+        with open(path, 'rb') as f:
+            before = f.read()
+
         result = self.run_upload(path)
 
         self.assert_rejected(result, 'row 3')
         self.assertEqual(self.created_depositions(), [])
-        self.assertEqual(self.read_dois(), self.read_dois()[:1])  # only the import header
+        with open(path, 'rb') as f:
+            self.assertEqual(f.read(), before)
 
     def test_upload_does_not_ask_for_confirmation_on_an_unusable_file(self):
         self.make_pdf()
@@ -128,7 +132,7 @@ class TestMissingPdf(WorkspaceTestCase):
         self.assertIn('nime2025_1.pdf', result.output)
         self.assertIn('nime2025_3.pdf', result.output)
         self.assertEqual(self.fake.calls, [])
-        self.assertEqual(self.doi_lines(), [])
+        self.assertEqual(self.done_rows(), [])
 
 
 class TestOversizedPdf(WorkspaceTestCase):
@@ -153,7 +157,7 @@ class TestOversizedPdf(WorkspaceTestCase):
         self.assertIsNone(result.exception, result.output)
         self.assertIn('nime2025_2.pdf', result.output)
         self.assertEqual(self.fake.calls, [])
-        self.assertEqual(self.doi_lines(), [])
+        self.assertEqual(self.done_rows(), [])
 
     def test_pdf_exactly_at_limit_is_accepted(self):
         self.patch_sizes({'nime2025_1.pdf': 100 * MB, 'nime2025_2.pdf': 100 * MB})
@@ -161,7 +165,7 @@ class TestOversizedPdf(WorkspaceTestCase):
         result = self.run_upload(self.csv)
 
         self.assertIsNone(result.exception, result.output)
-        self.assertEqual(len(self.doi_lines()), 2)
+        self.assertEqual(len(self.done_rows()), 2)
 
     def test_check_does_not_enforce_pdf_size(self):
         self.patch_sizes({'nime2025_1.pdf': 500 * MB})

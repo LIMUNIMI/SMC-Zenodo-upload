@@ -63,10 +63,10 @@ class TestUploadHappyPath(WorkspaceTestCase):
         self.assertEqual(len(publish), 1)
         self.assertIn('/depositions/1000/actions/publish', publish[0]['url'])
 
-    def test_doi_is_recorded_with_deposition_id(self):
+    def test_doi_is_recorded_in_the_csv_with_deposition_id(self):
         self.run_upload(self.bib)
 
-        self.assertEqual(self.doi_lines(), ['nime2025_1.pdf,1000,10.5281/zenodo.1000'])
+        self.assertEqual(self.done_rows(), [('nime2025_1.pdf', '1000', '10.5281/zenodo.1000')])
 
     def test_success_is_reported(self):
         result = self.run_upload(self.bib)
@@ -87,11 +87,11 @@ class TestUploadHappyPath(WorkspaceTestCase):
         self.run_upload(bib)
 
         self.assertEqual(
-            self.doi_lines(),
+            self.done_rows(),
             [
-                'nime2025_3.pdf,1000,10.5281/zenodo.1000',
-                'nime2025_1.pdf,1001,10.5281/zenodo.1001',
-                'nime2025_2.pdf,1002,10.5281/zenodo.1002',
+                ('nime2025_3.pdf', '1000', '10.5281/zenodo.1000'),
+                ('nime2025_1.pdf', '1001', '10.5281/zenodo.1001'),
+                ('nime2025_2.pdf', '1002', '10.5281/zenodo.1002'),
             ],
         )
 
@@ -116,7 +116,7 @@ class TestUploadFailures(WorkspaceTestCase):
         self.assertIsNone(result.exception, result.output)
         self.assertIn('Error happened during submission', result.output)
         self.assertEqual(self.fake.uploaded, [(1000, 'nime2025_2.pdf')])
-        self.assertEqual(self.doi_lines(), ['nime2025_2.pdf,1000,10.5281/zenodo.1000'])
+        self.assertEqual(self.done_rows(), [('nime2025_2.pdf', '1000', '10.5281/zenodo.1000')])
 
     def test_create_failure_stops_further_calls_for_that_entry(self):
         self.fake.fail_create = 400
@@ -126,7 +126,7 @@ class TestUploadFailures(WorkspaceTestCase):
             self.call_summary(),
             [('GET', 'list'), ('POST', 'create'), ('GET', 'list'), ('POST', 'create')],
         )
-        self.assertEqual(self.doi_lines(), [])
+        self.assertEqual(self.done_rows(), [])
 
     def test_pdf_upload_failure_skips_entry_without_publishing(self):
         self.fake.fail_files = {'nime2025_1.pdf': 500}
@@ -138,7 +138,7 @@ class TestUploadFailures(WorkspaceTestCase):
         publish = self.fake.calls_to('/actions/publish')
         self.assertEqual(len(publish), 1)
         self.assertIn('/depositions/1001/', publish[0]['url'])
-        self.assertEqual(self.doi_lines(), ['nime2025_2.pdf,1001,10.5281/zenodo.1001'])
+        self.assertEqual(self.done_rows(), [('nime2025_2.pdf', '1001', '10.5281/zenodo.1001')])
 
     def test_publish_failure_records_nothing_and_continues(self):
         self.fake.fail_publish = 500
@@ -148,7 +148,7 @@ class TestUploadFailures(WorkspaceTestCase):
         self.assertIsNone(result.exception, result.output)
         self.assertIn('Error happened during publish', result.output)
         self.assertEqual(len(self.fake.calls_to('/actions/publish')), 2)
-        self.assertEqual(self.doi_lines(), [])
+        self.assertEqual(self.done_rows(), [])
         self.assertNotIn('PUBLISHED', result.output)
 
     def test_status_210_is_success_and_211_is_failure(self):
@@ -159,6 +159,10 @@ class TestUploadFailures(WorkspaceTestCase):
         self.reload_app()
         self.fake.calls.clear()
         self.fake.fail_create = FakeResponse(211, {'message': 'nope'})
+        self.write_csv(  # start again from clean rows
+            csv_row(key='nime2025_1', title='First'),
+            csv_row(key='nime2025_2', title='Second'),
+        )
         result = self.run_upload(self.bib)
         self.assertIn('Error happened during submission', result.output)
 

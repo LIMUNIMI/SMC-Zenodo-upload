@@ -2,8 +2,8 @@
 
 Tests never touch the network: ``requests.get``/``requests.post`` are replaced by
 :class:`FakeZenodo`. Each test runs in a temporary working directory because the
-program resolves ``./upload/``, ``secrets.toml``, ``conference.toml`` and
-``nime_dois.txt`` relative to the CWD.
+program resolves ``./upload/``, ``secrets.toml`` and ``conference.toml`` relative
+to the CWD.
 """
 
 import contextlib
@@ -70,7 +70,9 @@ class FakeZenodo:
 
     ``fail_create``/``fail_publish``/``fail_pdf`` take a status code (or a
     ``FakeResponse``) and apply to every deposition; ``fail_files`` maps an
-    uploaded filename to a status code (or ``FakeResponse``).
+    uploaded filename to a status code (or ``FakeResponse``). They stay set until
+    the test clears them. ``lost_publish`` makes a publish succeed on the server
+    while the answer is an error; ``doi_missing`` hides the DOI of depositions.
     """
 
     def __init__(self):
@@ -83,6 +85,9 @@ class FakeZenodo:
         self._next_id = 1000
         self._current_id = None
         self.uploaded = []  # (deposition_id, filename)
+        self.published = set()  # deposition ids
+        self.lost_publish = False
+        self.doi_missing = False
 
     # -- helpers -----------------------------------------------------------
     @staticmethod
@@ -103,8 +108,17 @@ class FakeZenodo:
         path = url.split('?')[0]
         if path.endswith('/api/deposit/depositions'):
             return FakeResponse(200, [])
+        if path.endswith('/files'):
+            deposition_id = int(path.split('/depositions/')[1].split('/')[0])
+            return FakeResponse(200, [
+                {'filename': name} for dep, name in self.uploaded if dep == deposition_id
+            ])
         deposition_id = int(path.rsplit('/', 1)[-1])
-        return FakeResponse(200, {'id': deposition_id, 'doi': self.doi_for(deposition_id)})
+        return FakeResponse(200, {
+            'id': deposition_id,
+            'doi': '' if self.doi_missing else self.doi_for(deposition_id),
+            'submitted': deposition_id in self.published,
+        })
 
     def post(self, url, params=None, json=None, headers=None, data=None, files=None, **kwargs):
         record = {
@@ -141,8 +155,12 @@ class FakeZenodo:
 
         if path.endswith('/actions/publish'):
             record['deposition_id'] = int(path.split('/depositions/')[1].split('/')[0])
+            if self.lost_publish:
+                self.published.add(record['deposition_id'])
+                return FakeResponse(500, {'message': 'timeout'})
             if self.fail_publish is not None:
                 return self._as_response(self.fail_publish)
+            self.published.add(record['deposition_id'])
             return FakeResponse(202, {'id': record['deposition_id']})
 
         raise AssertionError(f'Unexpected POST to {url}')
@@ -217,6 +235,7 @@ class WorkspaceTestCase(unittest.TestCase):
             writer = csv.DictWriter(f, fieldnames=fieldnames, restval='')
             writer.writeheader()
             writer.writerows(rows)
+        self.last_csv = path
         return path
 
     def make_file(self, name, content=b'%PDF-1.4 test'):
@@ -230,6 +249,7 @@ class WorkspaceTestCase(unittest.TestCase):
         """
         dest = os.path.join('upload', name)
         shutil.copy(os.path.join(FIXTURES_DIR, name), dest)
+        self.last_csv = dest
         with open(dest, encoding='utf-8', newline='') as f:
             for row in csv.DictReader(f):
                 if row.get('pdf'):
@@ -239,13 +259,17 @@ class WorkspaceTestCase(unittest.TestCase):
     def make_pdf(self, key='nime2025_1'):
         self.make_file(f'{key}.pdf')
 
-    def read_dois(self):
-        with open('nime_dois.txt', encoding='utf-8') as f:
-            return f.read().splitlines()
+    def read_state(self, path=None):
+        """Rows (dicts) of a CSV file as the program left it; default: the last one written."""
+        with open(path or self.last_csv, encoding='utf-8', newline='') as f:
+            return list(csv.DictReader(f))
 
-    def doi_lines(self):
-        """Lines of nime_dois.txt excluding the 'Uploaded ...' header lines."""
-        return [line for line in self.read_dois() if not line.startswith('Uploaded ')]
+    def done_rows(self, path=None):
+        """(pdf, deposition_id, doi) of the rows whose status is done, in file order."""
+        return [
+            (row['pdf'], row['deposition_id'], row['doi'])
+            for row in self.read_state(path) if row.get('status') == 'done'
+        ]
 
     # -- inspection helpers -------------------------------------------------------
     def created_depositions(self):

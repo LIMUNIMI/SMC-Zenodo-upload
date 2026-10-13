@@ -55,16 +55,17 @@ class TestSupplementaryMatching(SupplementaryTestCase):
             ],
         )
 
-    def test_no_marker_when_nothing_is_skipped(self):
+    def test_skipped_files_column_is_empty_when_nothing_is_skipped(self):
         self.make_file('nime2025_10_file01.mp4')
 
         self.run_upload(self.bib)
 
-        self.assertEqual(self.doi_lines(), ['nime2025_10.pdf,1000,10.5281/zenodo.1000'])
+        self.assertEqual(self.done_rows(), [('nime2025_10.pdf', '1000', '10.5281/zenodo.1000')])
+        self.assertEqual(self.read_state()[0]['skipped_files'], '')
 
 
 class TestOversizedSupplementary(SupplementaryTestCase):
-    def test_file_over_limit_is_skipped_and_marked_in_doi_line(self):
+    def test_file_over_limit_is_skipped_and_recorded(self):
         self.make_file('nime2025_10_file01.mp4')
         self.make_file('nime2025_10_file02.mov')
         self.patch_sizes({'nime2025_10_file01.mp4': 100 * MB + 1})
@@ -76,10 +77,8 @@ class TestOversizedSupplementary(SupplementaryTestCase):
         self.assertEqual(
             self.uploaded_names(), ['nime2025_10.pdf', 'nime2025_10_file02.mov']
         )
-        self.assertEqual(
-            self.doi_lines(),
-            ['nime2025_10.pdf,1000,10.5281/zenodo.1000*nime2025_10_file01.mp4'],
-        )
+        self.assertEqual(self.done_rows(), [('nime2025_10.pdf', '1000', '10.5281/zenodo.1000')])
+        self.assertEqual(self.read_state()[0]['skipped_files'], 'nime2025_10_file01.mp4')
 
     def test_file_exactly_at_limit_is_uploaded(self):
         self.make_file('nime2025_10_file01.mp4')
@@ -88,7 +87,7 @@ class TestOversizedSupplementary(SupplementaryTestCase):
         self.run_upload(self.bib)
 
         self.assertIn('nime2025_10_file01.mp4', self.uploaded_names())
-        self.assertNotIn('*', self.doi_lines()[0])
+        self.assertEqual(self.read_state()[0]['skipped_files'], '')
 
     def test_multiple_skipped_files_are_semicolon_separated(self):
         self.make_file('nime2025_10_a.mp4')
@@ -100,12 +99,12 @@ class TestOversizedSupplementary(SupplementaryTestCase):
 
         self.run_upload(self.bib)
 
-        doi_field = self.doi_lines()[0].split(',')[2]
-        doi, skipped = doi_field.split('*')
-        self.assertEqual(doi, '10.5281/zenodo.1000')
+        row = self.read_state()[0]
+        self.assertEqual(row['doi'], '10.5281/zenodo.1000')
         # Order follows os.listdir, which is not guaranteed.
         self.assertEqual(
-            sorted(skipped.split(';')), ['nime2025_10_a.mp4', 'nime2025_10_b.mp4']
+            sorted(row['skipped_files'].split(';')),
+            ['nime2025_10_a.mp4', 'nime2025_10_b.mp4'],
         )
 
     def test_skipped_file_is_not_sent_to_server(self):
@@ -119,7 +118,7 @@ class TestOversizedSupplementary(SupplementaryTestCase):
 
 
 class TestSupplementaryServerErrors(SupplementaryTestCase):
-    def test_413_marks_file_as_skipped_and_run_continues(self):
+    def test_413_records_file_as_skipped_and_run_continues(self):
         self.make_file('nime2025_10_file01.mp4')
         self.make_file('nime2025_10_file02.mov')
         self.fake.fail_files = {
@@ -137,12 +136,10 @@ class TestSupplementaryServerErrors(SupplementaryTestCase):
             self.uploaded_names(), ['nime2025_10.pdf', 'nime2025_10_file02.mov']
         )
         self.assertEqual(len(self.fake.calls_to('/actions/publish')), 1)
-        self.assertEqual(
-            self.doi_lines(),
-            ['nime2025_10.pdf,1000,10.5281/zenodo.1000*nime2025_10_file01.mp4'],
-        )
+        self.assertEqual(self.done_rows(), [('nime2025_10.pdf', '1000', '10.5281/zenodo.1000')])
+        self.assertEqual(self.read_state()[0]['skipped_files'], 'nime2025_10_file01.mp4')
 
-    def test_other_server_error_marks_file_as_skipped(self):
+    def test_other_server_error_records_file_as_skipped(self):
         self.make_file('nime2025_10_file01.mp4')
         self.fake.fail_files = {'nime2025_10_file01.mp4': 500}
 
@@ -150,9 +147,9 @@ class TestSupplementaryServerErrors(SupplementaryTestCase):
 
         self.assertIn('Error happened during supplementary file upload', result.output)
         self.assertNotIn('HTTP 413', result.output)
-        self.assertTrue(self.doi_lines()[0].endswith('*nime2025_10_file01.mp4'))
+        self.assertEqual(self.read_state()[0]['skipped_files'], 'nime2025_10_file01.mp4')
 
-    def test_skipped_marker_is_reported_on_console(self):
+    def test_skipped_files_are_reported_on_console(self):
         self.make_file('nime2025_10_file01.mp4')
         self.fake.fail_files = {'nime2025_10_file01.mp4': 500}
 

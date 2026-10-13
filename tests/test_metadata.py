@@ -74,7 +74,7 @@ class TestMetadataMapping(WorkspaceTestCase):
         path = self.write_csv({
             'KEY': 'nime2025_1', 'Pdf': 'nime2025_1.pdf', 'TITLE': 'Upper',
             'Authors': 'Doe, Jane', 'abstract': 'lower abstract',
-            'track': 'Papers', 'status': 'garbage', 'whatever': 'x',
+            'track': 'Papers', 'whatever': 'garbage',
         })
         result = self.run_upload(path)
 
@@ -208,10 +208,14 @@ class TestCheckCommand(WorkspaceTestCase):
         self.assertIn('conferencepaper', result.output)
         self.assertEqual(self.fake.calls, [])
 
-    def test_check_does_not_write_dois(self):
+    def test_check_does_not_modify_the_file(self):
+        with open(self.bib, 'rb') as f:
+            before = f.read()
+
         self.run_check(self.bib)
 
-        self.assertEqual(self.doi_lines(), [])
+        with open(self.bib, 'rb') as f:
+            self.assertEqual(f.read(), before)
 
     def test_check_authors_prints_names_only(self):
         result = self.run_check(self.bib, '--authors')

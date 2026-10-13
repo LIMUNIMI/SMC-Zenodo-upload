@@ -46,10 +46,11 @@ class TestUploadCommand(WorkspaceTestCase):
         self.assertEqual(result.exit_code, 2)
         self.assertEqual(self.fake.calls, [])
 
-    def test_title_flag_is_accepted(self):
+    def test_title_flag_no_longer_exists(self):
         result = self.run_upload(self.bib, '--title')
 
-        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(result.exit_code, 2)
+        self.assertEqual(self.fake.calls, [])
 
     def test_unknown_option_is_rejected(self):
         result = self.run_upload(self.bib, '--nope')

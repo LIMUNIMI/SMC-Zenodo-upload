@@ -7,25 +7,13 @@ from tests.support import MB, MODULE_NAME, WorkspaceTestCase, csv_row
 
 
 class TestImportSideEffects(WorkspaceTestCase):
-    # Characterization: the module writes to nime_dois.txt and reads
-    # conference.toml and secrets.toml at import time. May change in refactor.
+    # The module reads conference.toml and secrets.toml at import time and
+    # writes nothing.
 
-    def test_import_appends_upload_header_to_dois_file(self):
-        lines = self.read_dois()
-        self.assertEqual(len(lines), 1)
-        self.assertRegex(lines[0], r'^Uploaded \d{4}-\d{2}-\d{2} \d{2}:\d{2}\s*$')
-
-    def test_import_appends_and_does_not_overwrite_existing_dois_file(self):
-        with open('nime_dois.txt', 'a') as f:
-            f.write('old.pdf,1,10.5281/zenodo.1\n')
-        sys.modules.pop(MODULE_NAME)
-        importlib.import_module(MODULE_NAME)
-
-        lines = self.read_dois()
-        self.assertEqual(len(lines), 3)
-        self.assertEqual(lines[1], 'old.pdf,1,10.5281/zenodo.1')
-        self.assertTrue(lines[0].startswith('Uploaded '))
-        self.assertTrue(lines[2].startswith('Uploaded '))
+    def test_import_creates_no_files(self):
+        self.assertEqual(
+            sorted(os.listdir('.')), ['conference.toml', 'secrets.toml', 'upload']
+        )
 
     def test_missing_token_key_fails_when_that_server_is_used(self):
         with open('secrets.toml', 'w') as f:
@@ -68,11 +56,6 @@ class TestImportWithoutConferenceFile(WorkspaceTestCase):
         with self.assertRaises(FileNotFoundError):
             importlib.import_module(MODULE_NAME)
 
-    def test_missing_conference_file_leaves_dois_file_untouched(self):
-        with self.assertRaises(FileNotFoundError):
-            importlib.import_module(MODULE_NAME)
-        self.assertFalse(os.path.exists('nime_dois.txt'))
-
 
 class TestConfiguration(WorkspaceTestCase):
     def test_upload_folder_is_relative_upload_directory(self):
@@ -88,8 +71,14 @@ class TestConfiguration(WorkspaceTestCase):
         self.assertIn('New Interfaces for Musical Expression', self.app.CONFERENCE_TITLE)
         self.assertTrue(self.app.CONFERENCE_DATES)
 
-    def test_dois_filename(self):
-        self.assertEqual(self.app.DOI_FILENAME, 'nime_dois.txt')
+    def test_state_columns_and_stages(self):
+        self.assertEqual(
+            self.app.STATE_COLUMNS,
+            ('status', 'server', 'deposition_id', 'doi', 'skipped_files', 'error', 'updated_at'),
+        )
+        self.assertEqual(
+            self.app.STAGES, ('pending', 'created', 'uploaded', 'published', 'done')
+        )
 
 
 if __name__ == '__main__':

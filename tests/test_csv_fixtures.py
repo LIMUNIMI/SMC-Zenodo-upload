@@ -36,14 +36,14 @@ class TestValidEntries(WorkspaceTestCase):
         self.assertEqual(md['description'], '---')  # no abstract in the entry
         self.assertNotIn('conference_session', md)
         self.assertEqual(
-            self.doi_lines(),
-            ['nime2008_installations_Paek.pdf,1000,10.5281/zenodo.1000'],
+            self.done_rows(),
+            [('nime2008_installations_Paek.pdf', '1000', '10.5281/zenodo.1000')],
         )
 
     def test_paper_entry_is_uploaded_with_abstract_and_all_authors(self):
         path = self.copy_fixture('valid_paper.csv')
 
-        result = self.run_upload(path, '--title')
+        result = self.run_upload(path)
 
         self.assertIsNone(result.exception, result.output)
         md = self.created_metadata()[0]
@@ -55,7 +55,7 @@ class TestValidEntries(WorkspaceTestCase):
         self.assertTrue(md['description'].startswith('Development of a musical interface'))
         # The PDF name comes from the pdf column, not from the entry key.
         self.assertEqual(
-            self.doi_lines(), ['nime2006_172.pdf,1000,10.5281/zenodo.1000,TENORI-ON']
+            self.done_rows(), [('nime2006_172.pdf', '1000', '10.5281/zenodo.1000')]
         )
 
 
