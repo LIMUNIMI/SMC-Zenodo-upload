@@ -24,7 +24,7 @@ class TestMetadataMapping(WorkspaceTestCase):
             address='Utrecht, Netherlands',
             pages='10--15',
             abstract='An abstract.',
-            booktitle='Proceedings of NIME',
+            booktitle='Proceedings of EXC',
             note='Paper Session 2',
             isbn='978-1-0000-0000-0',
             issn='2220-4806',
@@ -35,14 +35,14 @@ class TestMetadataMapping(WorkspaceTestCase):
         self.assertEqual(md['publication_type'], 'conferencepaper')
         self.assertEqual(md['description'], 'An abstract.')
         self.assertEqual(md['conference_place'], 'Utrecht, Netherlands')
-        self.assertEqual(md['conference_url'], 'https://nime.org')
-        self.assertEqual(md['partof_title'], 'Proceedings of NIME')
-        self.assertEqual(md['imprint_title'], 'Proceedings of NIME')
+        self.assertEqual(md['conference_url'], 'https://example.org')
+        self.assertEqual(md['partof_title'], 'Proceedings of EXC')
+        self.assertEqual(md['imprint_title'], 'Proceedings of EXC')
         self.assertEqual(md['partof_pages'], '10--15')
         self.assertEqual(md['conference_session'], 'Paper Session 2')
         self.assertEqual(md['imprint_isbn'], '978-1-0000-0000-0')
         self.assertEqual(md['imprint_issn'], '2220-4806')
-        self.assertEqual(md['communities'], [{'identifier': 'nime_conference'}])
+        self.assertEqual(md['communities'], [{'identifier': 'example_community'}])
         self.assertEqual(
             md['creators'], [{'name': 'Doe, Jane'}, {'name': 'Roe, Richard'}]
         )

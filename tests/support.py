@@ -22,7 +22,7 @@ from unittest import mock
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES_DIR = os.path.join(REPO_ROOT, 'tests', 'fixtures')
-MODULE_NAME = 'nime_zenodo_upload.__main__'
+MODULE_NAME = 'zenodo_upload.__main__'
 
 # Absolute path: the CWD changes during tests, so '' in sys.path would break.
 if REPO_ROOT not in sys.path:
@@ -34,8 +34,10 @@ SANDBOX_TOKEN = 'SBX-TOKEN'
 CONFERENCE_TOML = (
     "PUBLICATION_DATE = '2026-06-23'\n"
     "CONFERENCE_DATES = '23 June - 26 June, 2026'\n"
-    "CONFERENCE_TITLE = 'International Conference on New Interfaces for Musical Expression'\n"
-    "CONFERENCE_ACRONYM = 'NIME'\n"
+    "CONFERENCE_TITLE = 'Example Conference on Sound'\n"
+    "CONFERENCE_ACRONYM = 'EXC'\n"
+    "CONFERENCE_URL = 'https://example.org'\n"
+    "ZENODO_COMMUNITY = 'example_community'\n"
 )
 
 
@@ -191,7 +193,7 @@ class WorkspaceTestCase(unittest.TestCase):
     def setUp(self):
         self._old_cwd = os.getcwd()
         self._old_module = sys.modules.pop(MODULE_NAME, None)
-        self.tmp = tempfile.mkdtemp(prefix='nime_test_')
+        self.tmp = tempfile.mkdtemp(prefix='zenodo_test_')
         os.chdir(self.tmp)
         os.mkdir('upload')
         if self.write_secrets:

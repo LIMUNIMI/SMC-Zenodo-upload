@@ -1,8 +1,9 @@
 """
-Convert between NIME .bib files and the CSV read by nime_zenodo_upload.
+Convert between a conference .bib file (one entry per paper, `url` ending with
+the PDF name) and the CSV read by zenodo_upload.
 
-    python bibcsv/bibcsv.py bib2csv upload/nime2026_papers.bib upload/nime2026_papers.csv
-    python bibcsv/bibcsv.py csv2bib upload/nime2026_papers.csv nime2026_papers.bib
+    python bibcsv/bibcsv.py bib2csv proceedings.bib upload/proceedings.csv
+    python bibcsv/bibcsv.py csv2bib upload/proceedings.csv proceedings.bib
 
 CSV format: one row per entry, UTF-8, comma-separated, header row required.
   - key:        the bibtex key
@@ -10,7 +11,7 @@ CSV format: one row per entry, UTF-8, comma-separated, header row required.
   - authors:    "Last, First; Last, First" (`and` in the .bib)
   - every other .bib field is a lower-case column of its own (track, note, ...)
   - status, server, deposition_id, doi, skipped_files, error, updated_at are
-    written by nime_zenodo_upload and are left empty by bib2csv (`doi` is also
+    written by zenodo_upload and are left empty by bib2csv (`doi` is also
     filled from the .bib when it has one).
 """
 

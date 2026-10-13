@@ -3,7 +3,7 @@ import os
 import sys
 import unittest
 
-from tests.support import MB, MODULE_NAME, WorkspaceTestCase, csv_row
+from tests.support import CONFERENCE_TOML, MB, MODULE_NAME, WorkspaceTestCase, csv_row
 
 
 class TestImportSideEffects(WorkspaceTestCase):
@@ -57,6 +57,21 @@ class TestImportWithoutConferenceFile(WorkspaceTestCase):
             importlib.import_module(MODULE_NAME)
 
 
+class TestIncompleteConferenceFile(WorkspaceTestCase):
+    write_conference = False
+
+    def test_missing_conference_key_fails_at_import(self):
+        for key in ('CONFERENCE_URL', 'ZENODO_COMMUNITY'):
+            with self.subTest(key=key):
+                with open('conference.toml', 'w') as f:
+                    f.writelines(
+                        line for line in CONFERENCE_TOML.splitlines(keepends=True)
+                        if not line.startswith(key)
+                    )
+                with self.assertRaises(KeyError):
+                    importlib.import_module(MODULE_NAME)
+
+
 class TestConfiguration(WorkspaceTestCase):
     def test_upload_folder_is_relative_upload_directory(self):
         self.assertEqual(os.path.normpath(self.app.UPLOAD_FOLDER), 'upload')
@@ -67,9 +82,11 @@ class TestConfiguration(WorkspaceTestCase):
 
     def test_conference_constants_are_set(self):
         self.assertRegex(self.app.PUBLICATION_DATE, r'^\d{4}-\d{2}-\d{2}$')
-        self.assertEqual(self.app.CONFERENCE_ACRONYM, 'NIME')
-        self.assertIn('New Interfaces for Musical Expression', self.app.CONFERENCE_TITLE)
+        self.assertEqual(self.app.CONFERENCE_ACRONYM, 'EXC')
+        self.assertEqual(self.app.CONFERENCE_TITLE, 'Example Conference on Sound')
         self.assertTrue(self.app.CONFERENCE_DATES)
+        self.assertEqual(self.app.CONFERENCE_URL, 'https://example.org')
+        self.assertEqual(self.app.ZENODO_COMMUNITY, 'example_community')
 
     def test_state_columns_and_stages(self):
         self.assertEqual(

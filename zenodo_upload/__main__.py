@@ -3,7 +3,7 @@
 Written by Benedikte Wallace, 2018, edited by Charles Martin, 2024, and Stefano Fasciani 2025-2026.
 
 This script reads a CSV file (one row per paper, see README; bibcsv/bibcsv.py
-converts NIME .bib files to it) and creates a deposition record on the Zenodo
+converts the conference's .bib file to it) and creates a deposition record on the Zenodo
 website. The metadata from the CSV rows are tied to the article (.pdf file) and
 are published to Zenodo resulting in the creation of a DOI. The outcome of every
 row (status, deposition id, DOI, errors) is written back to the same CSV file after each step,
@@ -16,9 +16,9 @@ If a resource contains supplementary files that should be uploaded together with
 supplementary file should have the same base file name as the paper PDF with an additional
 suffix such as _file01, _file02, etc., appended before the extension, e.g.:
 
-    nime2025_10.pdf
-    nime2025_10_file01.mp4
-    nime2025_10_file02.mov
+    paper_10.pdf
+    paper_10_file01.mp4
+    paper_10_file02.mov
 
 Supplementary files larger than 100 MB are skipped by this script: they are NOT uploaded via
 the API. The script:
@@ -51,6 +51,8 @@ PUBLICATION_DATE = conference_data['PUBLICATION_DATE']
 CONFERENCE_DATES = conference_data['CONFERENCE_DATES']
 CONFERENCE_TITLE = conference_data['CONFERENCE_TITLE']
 CONFERENCE_ACRONYM = conference_data['CONFERENCE_ACRONYM']
+CONFERENCE_URL = conference_data['CONFERENCE_URL']
+ZENODO_COMMUNITY = conference_data['ZENODO_COMMUNITY']
 
 # Maximum size for automatic supplementary upload (100 MB)
 MAX_SUPP_BYTES = 100 * 1024 * 1024
@@ -545,12 +547,12 @@ def format_metadata(
                 'conference_acronym': CONFERENCE_ACRONYM,
                 'conference_dates': CONFERENCE_DATES,
                 'conference_place': field(row, 'address', 'Address'),
-                'conference_url': 'https://nime.org',
+                'conference_url': CONFERENCE_URL,
                 'publication_date': PUBLICATION_DATE,
                 'partof_title': partof_title,
                 'imprint_title': partof_title,
                 'creators': creators,
-                'communities': [{'identifier': 'nime_conference'}],  # adds to Zenodo NIME community
+                'communities': [{'identifier': ZENODO_COMMUNITY}],  # adds to the conference's community
                 'imprint_isbn': field(row, 'isbn'),
                 'imprint_issn': field(row, 'issn')
             }
@@ -637,7 +639,7 @@ def existing_file(path):
 
 
 def main(argv=None):
-    cli = argparse.ArgumentParser(prog='nime_zenodo_upload')
+    cli = argparse.ArgumentParser(prog='zenodo_upload')
     commands = cli.add_subparsers(dest='command', required=True)
 
     upload_cmd = commands.add_parser(

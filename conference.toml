@@ -1,5 +1,8 @@
-# Per-edition conference metadata. Update these values for each NIME edition.
-PUBLICATION_DATE = '2026-06-23'
-CONFERENCE_DATES = '23 June - 26 June, 2026'
-CONFERENCE_TITLE = 'International Conference on New Interfaces for Musical Expression'
-CONFERENCE_ACRONYM = 'NIME'
+# Per-edition conference metadata. Update these values for each conference edition.
+PUBLICATION_DATE = 'YYYY-MM-DD'
+CONFERENCE_DATES = '5 November - 7 November, 2026'
+CONFERENCE_TITLE = 'Sound and Music Computing Conference'
+CONFERENCE_ACRONYM = 'SMC'
+CONFERENCE_URL = 'https://example.org'
+# Identifier of the Zenodo community the records are added to (zenodo.org/communities/<identifier>/)
+ZENODO_COMMUNITY = 'smc'
