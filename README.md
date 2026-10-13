@@ -220,6 +220,21 @@ During post-processing, you can:
 
 The .bib file: Special characters in the .bib file should be written with UTF-8 symbols and **not** in LaTeX code. This follows the convention for the bibliography repo.
 
+### Converting between `.bib` and CSV
+
+`bibcsv/bibcsv.py` is a standalone tool (its own `bibcsv/requirements.txt`) that converts the `.bib` file to a CSV with one row per entry and back:
+
+```bash
+python bibcsv/bibcsv.py bib2csv upload/nime2036_music.bib upload/nime2036_music.csv
+python bibcsv/bibcsv.py csv2bib upload/nime2036_music.csv nime2036_music.bib
+```
+
+- `key`, `pdf` (last segment of `url`) and `authors` (`Last, First; Last, First`) come first; every other `.bib` field is kept as a lower-case column (`track`, `note`, ...), followed by the columns `status`, `server`, `deposition_id`, `doi`, `skipped_files`, `error`, `updated_at`.
+- Entries with unreadable author names are reported by key and nothing is written; `--skip-invalid` converts the readable entries anyway. `editor` is copied as it is.
+- Empty fields are not written back to the `.bib`.
+
+Tests: `python -m unittest discover -s bibcsv/tests`.
+
 ## Acknowledgements
 
 - Thanks to [Benedikte Wallace](https://www.linkedin.com/in/benedikte-wallace-8b489782/) for developing the Zenodo upload script in 2017–2018 or so.

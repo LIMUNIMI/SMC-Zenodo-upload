@@ -1,0 +1,4 @@
+pybtex>=0.24,<0.25
+# setuptools<70 is needed because pybtex still imports pkg_resources,
+# which is no longer bundled with newer setuptools versions.
+setuptools<70
