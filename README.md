@@ -208,3 +208,4 @@ Tests: `python -m unittest discover -s bibcsv/tests`.
 - Thanks to [Benedikte Wallace](https://www.linkedin.com/in/benedikte-wallace-8b489782/) for developing the Zenodo upload script in 2017–2018 or so.
 - Charles Martin did some work on this in 2024.
 - Stefano Fasciani did some work on this in 2025 and 2026.
+- Giorgio Presti refactored the script and made it conference-agnostic in 2026 (originally written for NIME).

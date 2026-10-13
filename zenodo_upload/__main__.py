@@ -1,6 +1,7 @@
 ########################################################
 '''
 Written by Benedikte Wallace, 2018, edited by Charles Martin, 2024, and Stefano Fasciani 2025-2026.
+Originally written for NIME; refactored and made conference-agnostic by Giorgio Presti, 2026.
 
 This script reads a CSV file (one row per paper, see README; bibcsv/bibcsv.py
 converts the conference's .bib file to it) and creates a deposition record on the Zenodo
