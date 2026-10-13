@@ -2,11 +2,11 @@
 
 This Python project is for uploading NIME proceedings to Zenodo for archiving submissions and generating DOIs.
 
-> **DANGER!** Uploading and publishing to Zenodo should only happen ONCE for each proceedings entry. You **must** test the script using Zenodo's sandbox multiple times and make super sure that your metadata records (`.bib` file) are absolutely correct before uploading to production Zenodo.
+> **DANGER!** Uploading and publishing to Zenodo should only happen ONCE for each proceedings entry. You **must** test the script using Zenodo's sandbox multiple times and make super sure that your metadata records (CSV file) are absolutely correct before uploading to production Zenodo.
 
-The python script reads a `.bib file` as used for the [NIME archive](https://github.com/NIME-conference/NIME-bibliography) and creates a deposition record on the [Zenodo website](https://zenodo.org/communities/nime_conference/).
+The python script reads a CSV file with one row per paper (made from the `.bib` file used for the [NIME archive](https://github.com/NIME-conference/NIME-bibliography), see [The CSV file](#the-csv-file)) and creates a deposition record on the [Zenodo website](https://zenodo.org/communities/nime_conference/).
 
-The metadata from the .bib entries are tied to the article (.pdf file) and are published to Zenodo resulting in the creation of a DOI.
+The metadata from the CSV rows are tied to the article (.pdf file) and are published to Zenodo resulting in the creation of a DOI.
 
 When this script is used to upload a new batch of papers the DOI and file name of each paper are added to the text file `nime_dois.txt`. Optionally (with the `--title` flag) the paper title is also appended as a final field on each line, which is especially handy when working with translated papers and multiple DOIs.
 
@@ -15,8 +15,8 @@ This project requires Python 3.11 or newer; dependencies are listed in `requirem
 For the proceedings chair of the conference, your workflow should be:
 
 1. (before the conference) make sure **all** camera-ready submissions for each track are correct and hassle authors to update if there are errors—do this before the conference and emphasise that submissions cannot be updated after the conference.
-2. (after the conference) create an accurate spreadsheet for all submissions that should be in the proceedings for each track. Create a `.bib` file from these data following the format in the [NIME bibliography](https://github.com/NIME-conference/NIME-bibliography). All fields must be filled in except for `doi`.
-3. put the `.bib` file and pdf submission files into the `upload` directory of this project.
+2. (after the conference) create an accurate spreadsheet for all submissions that should be in the proceedings for each track. Create a `.bib` file from these data following the format in the [NIME bibliography](https://github.com/NIME-conference/NIME-bibliography). All fields must be filled in except for `doi`. Convert it to CSV with `bibcsv/bibcsv.py bib2csv` (see [below](#the-csv-file)).
+3. put the `.csv` file and pdf submission files into the `upload` directory of this project.
 4. follow the "Install" and "Run" instructions below and test multiple times with the Zenodo sandbox to make sure that your metadata is correct and working.
 5. upload to production Zenodo. The output file `nime_dois.txt` will show the DOI for each pdf you have uploaded.
 
@@ -47,7 +47,7 @@ python nime_zenodo_upload --help
 To run the program you will need to:
 
 - place all pdfs to be uploaded into the `upload` directory
-- find your bibtex file (e.g., `nime2036_music.bib`) with metadata for the PDFs
+- find your CSV file (e.g., `nime2036_music.csv`) with metadata for the PDFs
 - place a file named `secrets.toml` in the same directory as this readme file. The `secrets.toml` file should have two records (you can copy, rename and edit the `secrets.toml.example` scaffold):
 
   ```toml
@@ -58,13 +58,13 @@ To run the program you will need to:
 Once you have your data in place, you can view the metadata that will be created (without uploading) by running:
 
 ```bash
-python nime_zenodo_upload check upload/nime2036_music.bib
+python nime_zenodo_upload check upload/nime2036_music.csv
 ```
 
 It's a good idea to check the author names carefully as they may have been processed incorrectly:
 
 ```bash
-python nime_zenodo_upload check upload/nime2036_music.bib --authors
+python nime_zenodo_upload check upload/nime2036_music.csv --authors
 ```
 
 Typically you would run the checks many times to make sure the metadata is perfect.
@@ -72,13 +72,13 @@ Typically you would run the checks many times to make sure the metadata is perfe
 When your metadata is ready you can try uploading to the sandbox server:
 
 ```bash
-python nime_zenodo_upload upload upload/nime2023_music.bib
+python nime_zenodo_upload upload upload/nime2023_music.csv
 ```
 
 By default, the program uploads to the Zenodo sandbox. When you are **absolutely ready to commit to the production server** you can run:
 
 ```bash
-python nime_zenodo_upload upload upload/nime2023_music.bib --production
+python nime_zenodo_upload upload upload/nime2023_music.csv --production
 ```
 
 to do your final uploads.
@@ -86,7 +86,7 @@ to do your final uploads.
 You can also request that the title be written into `nime_dois.txt` alongside the DOI by adding the `--title` flag:
 
 ```bash
-python nime_zenodo_upload upload upload/nime2023_music.bib --title
+python nime_zenodo_upload upload upload/nime2023_music.csv --title
 ```
 
 This is particularly useful when you later need to associate DOIs with translated titles or multiple language versions.
@@ -216,16 +216,32 @@ During post-processing, you can:
 3. Manually upload those large supplementary files to the corresponding Zenodo deposition via the web UI.
 4. Optionally, update or regenerate `nime_dois.txt` once the manual uploads are complete and you know the final DOIs you want to distribute.
 
-## The `.bib` file
+## The CSV file
 
-The .bib file: Special characters in the .bib file should be written with UTF-8 symbols and **not** in LaTeX code. This follows the convention for the bibliography repo.
+One row per paper, UTF-8 (a BOM from Excel is accepted), comma-separated, with a header row. Column names are case-insensitive.
+
+| Column | |
+|---|---|
+| `key` | required, unique (the bibtex key) |
+| `pdf` | required, file name of the paper in `upload/`; supplementary files are `<pdf name without .pdf>_*` |
+| `title` | required |
+| `authors` | required, `Last, First; Last, First` |
+| `affiliations` | optional, one per author in the same order, separated by `;` (leave an author's slot empty if unknown) |
+| `abstract` | optional, `---` if empty |
+| `pages`, `note` (session), `booktitle`, `isbn`, `issn` | optional |
+| `address` | optional, conference place; `Address` if empty |
+
+Any other column (`track`, `year`, `url`, ...) is ignored by the upload. The whole file is checked before anything is sent: missing columns, empty required cells, duplicate keys and affiliations that do not match the authors are reported together and nothing is uploaded.
+
+Special characters must be written with UTF-8 symbols and **not** in LaTeX code, as in the bibliography repo.
 
 ### Converting between `.bib` and CSV
 
-`bibcsv/bibcsv.py` is a standalone tool (its own `bibcsv/requirements.txt`) that converts the `.bib` file to a CSV with one row per entry and back:
+`bibcsv/bibcsv.py` is a standalone tool (its own `bibcsv/requirements.txt`, which includes `pybtex`) that converts the `.bib` file to the CSV above and back:
 
 ```bash
-python bibcsv/bibcsv.py bib2csv upload/nime2036_music.bib upload/nime2036_music.csv
+pip install -r bibcsv/requirements.txt
+python bibcsv/bibcsv.py bib2csv nime2036_music.bib upload/nime2036_music.csv
 python bibcsv/bibcsv.py csv2bib upload/nime2036_music.csv nime2036_music.bib
 ```
 

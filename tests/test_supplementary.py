@@ -1,14 +1,14 @@
 import unittest
 from unittest import mock
 
-from tests.support import MB, FakeResponse, WorkspaceTestCase, bib_entry, fake_sizes
+from tests.support import MB, FakeResponse, WorkspaceTestCase, csv_row, fake_sizes
 
 
 class SupplementaryTestCase(WorkspaceTestCase):
     def setUp(self):
         super().setUp()
         self.make_pdf('nime2025_10')
-        self.bib = self.write_bib(bib_entry(key='nime2025_10', title='With Extras'))
+        self.bib = self.write_csv(csv_row(key='nime2025_10', title='With Extras'))
 
     def patch_sizes(self, sizes):
         patcher = mock.patch('os.path.getsize', side_effect=fake_sizes(sizes))

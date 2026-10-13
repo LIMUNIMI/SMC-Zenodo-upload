@@ -2,9 +2,9 @@
 '''
 Written by Benedikte Wallace, 2018, edited by Charles Martin, 2024, and Stefano Fasciani 2025-2026.
 
-This script reads .bib files in NIME archive and creates a deposition record
-on the Zenodo website. The metadata from the .bib entries are tied to the
-article (.pdf file) and are published to Zenodo resulting in the creation
+This script reads a CSV file (one row per paper, see README; bibcsv/bibcsv.py
+converts NIME .bib files to it) and creates a deposition record on the Zenodo
+website. The metadata from the CSV rows are tied to the article (.pdf file) and are published to Zenodo resulting in the creation
 of a DOI. When this script is used to upload a new batch of papers the DOI
 and file name of each paper are added to the text file nime_dois.txt.
 
@@ -32,16 +32,12 @@ Zenodo displays files alphabetically in its UI.
 import json
 import requests
 import argparse
+import csv
 import datetime
 import os
 import sys
 import tomllib
 import pprint
-
-from pybtex.database.input import bibtex
-
-# Bibtex parser
-parser = bibtex.Parser()
 
 UPLOAD_FOLDER = './upload/'
 
@@ -270,8 +266,59 @@ def upload_to_zenodo(metadata, pdf_path, production_zenodo=False, add_title=Fals
         doi_file.write(line)
 
 
+class InputError(Exception):
+    """The CSV file cannot be used; the message lists every problem found."""
+
+
+REQUIRED_COLUMNS = ('key', 'pdf', 'title', 'authors')
+
+
+def split_authors(value):
+    return [name.strip() for name in value.split(';') if name.strip()]
+
+
+def read_rows(csvfilename):
+    """
+    Read the CSV file: one dict per row, column names in lower case, values stripped.
+    Raises InputError, listing all problems, before anything is uploaded.
+    """
+    with open(csvfilename, encoding='utf-8-sig', newline='') as f:
+        reader = csv.DictReader(f)
+        reader.fieldnames = [name.strip().lower() for name in reader.fieldnames or []]
+        rows = [
+            {name: (value or '').strip() for name, value in row.items() if name is not None}
+            for row in reader
+        ]
+
+    missing_columns = [name for name in REQUIRED_COLUMNS if name not in reader.fieldnames]
+    if missing_columns:
+        raise InputError(f"{csvfilename}: missing column(s): {', '.join(missing_columns)}")
+
+    problems = []
+    seen_keys = set()
+    for number, row in enumerate(rows, start=2):  # row 1 is the header
+        label = f"row {number} ({row['key'] or 'no key'})"
+        empty = [name for name in REQUIRED_COLUMNS if not row[name]]
+        if empty:
+            problems.append(f"{label}: empty {', '.join(empty)}")
+        if row['key'] in seen_keys:
+            problems.append(f"{label}: duplicate key")
+        seen_keys.add(row['key'])
+        affiliations = row.get('affiliations')
+        if affiliations and len(affiliations.split(';')) != len(split_authors(row['authors'])):
+            problems.append(f"{label}: affiliations do not match the number of authors")
+    if problems:
+        raise InputError(f"{csvfilename}:\n  " + "\n  ".join(problems))
+    return rows
+
+
+def field(row, name, default=None):
+    """Value of a CSV column, or default when the column is missing or empty."""
+    return row.get(name) or default
+
+
 def format_metadata(
-    bibfilename,
+    csvfilename,
     verbose=False,
     upload_pdf=False,
     print_authors=False,
@@ -279,38 +326,32 @@ def format_metadata(
     add_title=False
 ):
     '''
-    format_metadata(bibfilename):
-    - formats contents of entries in the .bib file referenced by bibfilename
-    - for each entry, metadata is formatted and the upload function
+    format_metadata(csvfilename):
+    - formats contents of the rows in the CSV file referenced by csvfilename
+    - for each row, metadata is formatted and the upload function
       above is called in order to publish record
     '''
-    bibdata = parser.parse_file(bibfilename)
+    rows = read_rows(csvfilename)
 
     # If we are going to upload PDFs, pre-check that none of them exceed MAX_PDF_BYTES.
     if upload_pdf:
         oversized_pdfs = []
         missing_pdfs = []
-        for bib_id in bibdata.entries:
-            b = bibdata.entries[bib_id].fields
-            try:
-                conf_url = b['Url']
-                pdf_name = conf_url.rsplit('/', 1)[-1]
-                pdf_path = os.path.join(UPLOAD_FOLDER, pdf_name)
+        for row in rows:
+            pdf_name = row['pdf']
+            pdf_path = os.path.join(UPLOAD_FOLDER, pdf_name)
 
-                if not os.path.exists(pdf_path):
-                    missing_pdfs.append(pdf_name)
-                    continue
-
-                size = os.path.getsize(pdf_path)
-                if size > MAX_PDF_BYTES:
-                    oversized_pdfs.append((pdf_name, size))
-            except KeyError:
-                # If Url is missing, this entry will fail later anyway; let the normal logic handle it.
+            if not os.path.exists(pdf_path):
+                missing_pdfs.append(pdf_name)
                 continue
+
+            size = os.path.getsize(pdf_path)
+            if size > MAX_PDF_BYTES:
+                oversized_pdfs.append((pdf_name, size))
 
         if missing_pdfs:
             secho(
-                "The following PDFs referenced in the .bib file do not exist in the upload folder:",
+                "The following PDFs referenced in the CSV file do not exist in the upload folder:",
                 fg='red'
             )
             for name in sorted(set(missing_pdfs)):
@@ -343,108 +384,70 @@ def format_metadata(
             )
             return
 
-    title = 'title'
-    abstract = 'abstract'
-    address = 'address'
-    creators = 'creators'
-    pubdate = '20XX-06-01'
-    pages = 'x-x'
-    conf_url = ''
-    pdf_name = ''
-    creators = []
+    # loop through the individual rows
+    for row in rows:
+        pdf_name = row['pdf']
 
-    # loop through the individual entries
-    for bib_id in bibdata.entries:
-        title = 'title'
-        abstract = 'abstract'
-        address = 'address'
-        creators = 'creators'
-        pubdate = '20XX-06-01'
-        pages = 'x-x'
-        conf_url = ''
-        pdf_name = ''
+        if not os.path.exists(UPLOAD_FOLDER + pdf_name):
+            secho(f'PDF: {pdf_name} does not exist in the upload folder!', fg='red')
+            raise Exception(f'The PDF {pdf_name} did not exist in the upload folder.')
+
+        affiliations = [a.strip() for a in field(row, 'affiliations', '').split(';')]
         creators = []
+        for index, author_name in enumerate(split_authors(row['authors'])):
+            creator = {'name': author_name}
+            if field(row, 'affiliations') and affiliations[index]:
+                creator['affiliation'] = affiliations[index]
+            creators.append(creator)
+            if print_authors:
+                pprint.pp(author_name)
 
-        b = bibdata.entries[bib_id].fields
-        try:
-            conf_url = b['Url']
-            pdf_name = conf_url.rsplit('/', 1)[-1]
+        pages = field(row, 'pages')
+        partof_title = field(row, 'booktitle')
+        conf_session = field(row, 'note')
 
-            if not os.path.exists(UPLOAD_FOLDER + pdf_name):
-                secho(f'PDF: {pdf_name} does not exist in the upload folder!', fg='red')
-                raise Exception(f'The PDF {pdf_name} did not exist in the upload folder.')
-
-            title = b['Title']
-            for author in bibdata.entries[bib_id].persons["Author"]:
-                author_name = str(author)
-                # TODO: would be better to use https://github.com/phfaist/pylatexenc
-                # author_name = bytes(author_name,"utf-8").decode("latex","ignore")
-                author_name = author_name.replace("}", "")
-                author_name = author_name.replace("{", "")
-                author_name = author_name.replace("\\\"", "")
-                creators.append({'name': author_name})
-                if print_authors:
-                    pprint.pp(author_name)
-
-            yr_seg = conf_url.rsplit('/', 1)[-2]
-            yr = yr_seg.rsplit('/', 1)[-1]
-            pubdate = yr + pubdate[4:]
-
-            address = b.get('Address', 'Address')
-            pages = b.get('Pages', None)
-            abstract = b.get('Abstract', '---')  # if no abstract is found, --- will be used as default
-            track = b.get('track')  # could be used for conference_session key
-            partof_title = b.get('booktitle')
-            conf_session = b.get('note', None)
-            isbn = b.get('isbn')
-            issn = b.get('issn')
-
-            data = {
-                'metadata': {
-                    'title': title,
-                    'upload_type': 'publication',
-                    'publication_type': 'conferencepaper',
-                    'description': abstract,
-                    'conference_title': CONFERENCE_TITLE,
-                    'conference_acronym': CONFERENCE_ACRONYM,
-                    'conference_dates': CONFERENCE_DATES,
-                    'conference_place': address,
-                    'conference_url': 'https://nime.org',
-                    'publication_date': PUBLICATION_DATE,  # pubdate, # TODO fix this aspect
-                    'partof_title': partof_title,
-                    'imprint_title': partof_title,
-                    'creators': creators,
-                    'communities': [{'identifier': 'nime_conference'}],  # adds to Zenodo NIME community
-                    'imprint_isbn': isbn,
-                    'imprint_issn': issn
-                }
+        data = {
+            'metadata': {
+                'title': row['title'],
+                'upload_type': 'publication',
+                'publication_type': 'conferencepaper',
+                'description': field(row, 'abstract', '---'),  # '---' if no abstract is given
+                'conference_title': CONFERENCE_TITLE,
+                'conference_acronym': CONFERENCE_ACRONYM,
+                'conference_dates': CONFERENCE_DATES,
+                'conference_place': field(row, 'address', 'Address'),
+                'conference_url': 'https://nime.org',
+                'publication_date': PUBLICATION_DATE,
+                'partof_title': partof_title,
+                'imprint_title': partof_title,
+                'creators': creators,
+                'communities': [{'identifier': 'nime_conference'}],  # adds to Zenodo NIME community
+                'imprint_isbn': field(row, 'isbn'),
+                'imprint_issn': field(row, 'issn')
             }
+        }
 
-            if conf_session is not None:
-                data['metadata']['conference_session'] = conf_session
+        if conf_session is not None:
+            data['metadata']['conference_session'] = conf_session
 
-            if pages is not None:
-                data['metadata']['partof_pages'] = pages
+        if pages is not None:
+            data['metadata']['partof_pages'] = pages
 
-            if verbose:
-                pprint.pp(data['metadata'])
+        if verbose:
+            pprint.pp(data['metadata'])
 
-            if upload_pdf:
-                upload_to_zenodo(
-                    data,
-                    pdf_name,
-                    production_zenodo=production_zenodo,
-                    add_title=add_title
-                )
-
-        except (KeyError):
-            # TODO Write failed bib ID's to a text file?
-            print("KeyError! Entry did not contain fields needed, continuing to next id - failed bib id: ", bib_id)
-            raise
+        if upload_pdf:
+            upload_to_zenodo(
+                data,
+                pdf_name,
+                production_zenodo=production_zenodo,
+                add_title=add_title
+            )
 
 
-def upload(bibfile, production, include_title):
-    """Process metadata from a .bibtex file and upload to Zenodo."""
+def upload(csvfile, production, include_title):
+    """Process metadata from a CSV file and upload to Zenodo."""
+    read_rows(csvfile)  # fail on an unusable file before asking for confirmation
     if production:
         secho(
             "WARNING! You are uploading to the production Zenodo server! "
@@ -458,7 +461,7 @@ def upload(bibfile, production, include_title):
         )
     input("Press Enter to continue or Ctrl-C to abort.")
     format_metadata(
-        bibfile,
+        csvfile,
         upload_pdf=True,
         verbose=False,
         print_authors=False,
@@ -467,11 +470,11 @@ def upload(bibfile, production, include_title):
     )
 
 
-def check(bibfile, authors):
-    """Process metadata from a .bibtex file and print out to check it."""
+def check(csvfile, authors):
+    """Process metadata from a CSV file and print out to check it."""
     if authors:
         format_metadata(
-            bibfile,
+            csvfile,
             upload_pdf=False,
             verbose=False,
             print_authors=True,
@@ -480,7 +483,7 @@ def check(bibfile, authors):
         )
     else:
         format_metadata(
-            bibfile,
+            csvfile,
             upload_pdf=False,
             verbose=True,
             print_authors=False,
@@ -500,9 +503,9 @@ def main(argv=None):
     commands = cli.add_subparsers(dest='command', required=True)
 
     upload_cmd = commands.add_parser(
-        'upload', help='Process metadata from a .bibtex file and upload to Zenodo.'
+        'upload', help='Process metadata from a CSV file and upload to Zenodo.'
     )
-    upload_cmd.add_argument('bibfile', type=existing_file)
+    upload_cmd.add_argument('csvfile', type=existing_file)
     upload_cmd.add_argument('--production', action='store_true')
     upload_cmd.add_argument(
         '--title',
@@ -512,16 +515,20 @@ def main(argv=None):
     )
 
     check_cmd = commands.add_parser(
-        'check', help='Process metadata from a .bibtex file and print out to check it.'
+        'check', help='Process metadata from a CSV file and print out to check it.'
     )
-    check_cmd.add_argument('bibfile', type=existing_file)
+    check_cmd.add_argument('csvfile', type=existing_file)
     check_cmd.add_argument('--authors', action='store_true')
 
     args = cli.parse_args(argv)
-    if args.command == 'upload':
-        upload(args.bibfile, args.production, args.include_title)
-    else:
-        check(args.bibfile, args.authors)
+    try:
+        if args.command == 'upload':
+            upload(args.csvfile, args.production, args.include_title)
+        else:
+            check(args.csvfile, args.authors)
+    except InputError as error:
+        secho(str(error), fg='red')
+        sys.exit(1)
 
 
 if __name__ == '__main__':

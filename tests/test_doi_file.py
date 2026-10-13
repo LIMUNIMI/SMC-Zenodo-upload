@@ -1,13 +1,13 @@
 import unittest
 
-from tests.support import WorkspaceTestCase, bib_entry
+from tests.support import WorkspaceTestCase, csv_row
 
 
 class TestDoiFileFormat(WorkspaceTestCase):
     def upload(self, *flags, **entry):
         entry.setdefault('key', 'nime2025_7')
         self.make_pdf(entry['key'])
-        bib = self.write_bib(bib_entry(**entry))
+        bib = self.write_csv(csv_row(**entry))
         result = self.run_upload(bib, *flags)
         self.assertIsNone(result.exception, result.output)
 

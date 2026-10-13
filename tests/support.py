@@ -7,6 +7,7 @@ program resolves ``./upload/``, ``secrets.toml``, ``conference.toml`` and
 """
 
 import contextlib
+import csv
 import importlib
 import io
 import json
@@ -147,23 +148,15 @@ class FakeZenodo:
         raise AssertionError(f'Unexpected POST to {url}')
 
 
-def bib_entry(key='nime2025_1', title='A Title', authors='Doe, Jane', year='2025',
-              url=None, **fields):
-    """Build a BibTeX entry string. ``None`` values omit the field.
+def csv_row(key='nime2025_1', title='A Title', authors='Doe, Jane', pdf=None, **fields):
+    """Build a CSV row (dict). ``None`` values become empty cells.
 
-    Field names are case-sensitive for the program (``Url``, ``Title``,
-    ``Address``, ``Pages``, ``Abstract`` capitalised; the rest lowercase).
+    ``pdf`` defaults to ``<key>.pdf``; ``authors`` uses ``;`` as separator.
     """
-    if url is None:
-        url = f'https://nime.org/proceedings/{year}/{key}.pdf'
-    values = {'Title': title, 'Url': url}
-    if authors is not None:
-        values['author'] = authors
+    values = {'key': key, 'pdf': f'{key}.pdf' if pdf is None else pdf,
+              'title': title, 'authors': authors}
     values.update(fields)
-    body = ',\n'.join(
-        f'  {name} = {{{value}}}' for name, value in values.items() if value is not None
-    )
-    return f'@inproceedings{{{key},\n{body}\n}}\n'
+    return {name: ('' if value is None else value) for name, value in values.items()}
 
 
 class WorkspaceTestCase(unittest.TestCase):
@@ -212,10 +205,18 @@ class WorkspaceTestCase(unittest.TestCase):
         self.app = importlib.import_module(MODULE_NAME)
 
     # -- file helpers ---------------------------------------------------------
-    def write_bib(self, *entries, name='test.bib'):
+    def write_csv(self, *rows, name='test.csv', encoding='utf-8'):
+        """Write rows (dicts, see :func:`csv_row`) to upload/<name>; header = union of keys."""
+        fieldnames = []
+        for row in rows:
+            for column in row:
+                if column not in fieldnames:
+                    fieldnames.append(column)
         path = os.path.join('upload', name)
-        with open(path, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(entries))
+        with open(path, 'w', encoding=encoding, newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, restval='')
+            writer.writeheader()
+            writer.writerows(rows)
         return path
 
     def make_file(self, name, content=b'%PDF-1.4 test'):
@@ -223,15 +224,16 @@ class WorkspaceTestCase(unittest.TestCase):
             f.write(content)
 
     def copy_fixture(self, name):
-        """Copy tests/fixtures/<name> into upload/ and create the PDF its url names.
+        """Copy tests/fixtures/<name> into upload/ and create the PDFs its rows name.
 
-        Returns the path of the copied .bib file.
+        Returns the path of the copied .csv file.
         """
         dest = os.path.join('upload', name)
         shutil.copy(os.path.join(FIXTURES_DIR, name), dest)
-        with open(dest, encoding='utf-8') as f:
-            for url in re.findall(r'^\s*url\s*=\s*\{([^}]*)\}', f.read(), re.M | re.I):
-                self.make_file(url.rsplit('/', 1)[-1])
+        with open(dest, encoding='utf-8', newline='') as f:
+            for row in csv.DictReader(f):
+                if row.get('pdf'):
+                    self.make_file(row['pdf'])
         return dest
 
     def make_pdf(self, key='nime2025_1'):
@@ -293,12 +295,12 @@ class WorkspaceTestCase(unittest.TestCase):
                 exit_code, exception = 1, e
         return CliResult(exit_code, out.getvalue(), exception)
 
-    def run_upload(self, bib_path, *args):
+    def run_upload(self, csv_path, *args):
         with mock.patch('builtins.input', return_value=''):
-            return self.run_cli('upload', bib_path, *args)
+            return self.run_cli('upload', csv_path, *args)
 
-    def run_check(self, bib_path, *args):
-        return self.run_cli('check', bib_path, *args)
+    def run_check(self, csv_path, *args):
+        return self.run_cli('check', csv_path, *args)
 
 
 def fake_sizes(sizes):

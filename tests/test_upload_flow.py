@@ -1,7 +1,7 @@
 import unittest
 
 from tests.support import (
-    PUBLIC_TOKEN, SANDBOX_TOKEN, FakeResponse, WorkspaceTestCase, bib_entry,
+    PUBLIC_TOKEN, SANDBOX_TOKEN, FakeResponse, WorkspaceTestCase, csv_row,
 )
 
 
@@ -9,7 +9,7 @@ class TestUploadHappyPath(WorkspaceTestCase):
     def setUp(self):
         super().setUp()
         self.make_pdf('nime2025_1')
-        self.bib = self.write_bib(bib_entry(key='nime2025_1', title='Happy'))
+        self.bib = self.write_csv(csv_row(key='nime2025_1', title='Happy'))
 
     def test_api_call_sequence(self):
         result = self.run_upload(self.bib)
@@ -77,11 +77,11 @@ class TestUploadHappyPath(WorkspaceTestCase):
     def test_multiple_entries_are_processed_in_bib_order(self):
         for n in (2, 3):
             self.make_pdf(f'nime2025_{n}')
-        bib = self.write_bib(
-            bib_entry(key='nime2025_3'),
-            bib_entry(key='nime2025_1'),
-            bib_entry(key='nime2025_2'),
-            name='multi.bib',
+        bib = self.write_csv(
+            csv_row(key='nime2025_3'),
+            csv_row(key='nime2025_1'),
+            csv_row(key='nime2025_2'),
+            name='multi.csv',
         )
 
         self.run_upload(bib)
@@ -103,9 +103,9 @@ class TestUploadFailures(WorkspaceTestCase):
         super().setUp()
         self.make_pdf('nime2025_1')
         self.make_pdf('nime2025_2')
-        self.bib = self.write_bib(
-            bib_entry(key='nime2025_1', title='First'),
-            bib_entry(key='nime2025_2', title='Second'),
+        self.bib = self.write_csv(
+            csv_row(key='nime2025_1', title='First'),
+            csv_row(key='nime2025_2', title='Second'),
         )
 
     def test_create_failure_skips_entry_and_continues(self):

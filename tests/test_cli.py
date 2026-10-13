@@ -1,14 +1,14 @@
 import unittest
 from unittest import mock
 
-from tests.support import WorkspaceTestCase, bib_entry
+from tests.support import WorkspaceTestCase, csv_row
 
 
 class TestUploadCommand(WorkspaceTestCase):
     def setUp(self):
         super().setUp()
         self.make_pdf()
-        self.bib = self.write_bib(bib_entry())
+        self.bib = self.write_csv(csv_row())
 
     def test_sandbox_banner_is_shown_by_default(self):
         result = self.run_upload(self.bib)
@@ -32,8 +32,8 @@ class TestUploadCommand(WorkspaceTestCase):
 
     def test_confirmation_is_requested_once_per_run(self):
         self.make_pdf('nime2025_2')
-        bib = self.write_bib(
-            bib_entry(key='nime2025_1'), bib_entry(key='nime2025_2'), name='two.bib'
+        bib = self.write_csv(
+            csv_row(key='nime2025_1'), csv_row(key='nime2025_2'), name='two.csv'
         )
         with mock.patch('builtins.input', return_value='') as prompt:
             self.run_cli('upload', bib)
@@ -41,7 +41,7 @@ class TestUploadCommand(WorkspaceTestCase):
         prompt.assert_called_once()
 
     def test_bibfile_must_exist(self):
-        result = self.run_upload('upload/missing.bib')
+        result = self.run_upload('upload/missing.csv')
 
         self.assertEqual(result.exit_code, 2)
         self.assertEqual(self.fake.calls, [])
@@ -60,7 +60,7 @@ class TestUploadCommand(WorkspaceTestCase):
 class TestCheckCommandOptions(WorkspaceTestCase):
     def test_check_does_not_ask_for_confirmation(self):
         self.make_pdf()
-        bib = self.write_bib(bib_entry())
+        bib = self.write_csv(csv_row())
         with mock.patch('builtins.input') as prompt:
             result = self.run_cli('check', bib)
 
@@ -69,7 +69,7 @@ class TestCheckCommandOptions(WorkspaceTestCase):
 
     def test_check_has_no_production_option(self):
         self.make_pdf()
-        bib = self.write_bib(bib_entry())
+        bib = self.write_csv(csv_row())
 
         result = self.run_check(bib, '--production')
 

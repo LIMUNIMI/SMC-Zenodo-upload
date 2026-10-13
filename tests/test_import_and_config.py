@@ -3,7 +3,7 @@ import os
 import sys
 import unittest
 
-from tests.support import MB, MODULE_NAME, WorkspaceTestCase, bib_entry
+from tests.support import MB, MODULE_NAME, WorkspaceTestCase, csv_row
 
 
 class TestImportSideEffects(WorkspaceTestCase):
@@ -33,11 +33,7 @@ class TestImportSideEffects(WorkspaceTestCase):
         sys.modules.pop(MODULE_NAME)
         self.app = importlib.import_module(MODULE_NAME)
         self.make_pdf()
-        bib = self.write_bib(
-            '@inproceedings{nime2025_1,\n  author = {Doe, Jane},\n  title = {T},\n'
-            '  url = {https://nime.org/proceedings/2025/nime2025_1.pdf}\n}\n'
-        )
-
+        bib = self.write_csv(csv_row())
         result = self.run_upload(bib)  # sandbox -> SANDBOX_TOKEN is missing
 
         self.assertIsInstance(result.exception, KeyError)
@@ -45,19 +41,16 @@ class TestImportSideEffects(WorkspaceTestCase):
 
 
 class TestInProcessState(WorkspaceTestCase):
-    def test_bib_entries_accumulate_across_runs_in_one_process(self):
-        # Characterization (likely a bug): the module-level pybtex parser keeps
-        # its data, so a second run in the same process sees the entries of the
-        # first one (here: "repeated bibliography entry"). Not reachable from
-        # the command line, where each run is a new process.
+    def test_runs_in_one_process_are_independent(self):
         self.make_pdf()
-        bib = self.write_bib(bib_entry())
-        first = self.run_check(bib)
+        path = self.write_csv(csv_row())
+
+        first = self.run_check(path)
+        second = self.run_check(path)
+
         self.assertIsNone(first.exception, first.output)
-
-        second = self.run_check(bib)
-
-        self.assertIsNotNone(second.exception)
+        self.assertIsNone(second.exception, second.output)
+        self.assertEqual(first.output, second.output)
 
 
 class TestImportWithoutSecrets(WorkspaceTestCase):

@@ -1,16 +1,16 @@
 import re
 import unittest
 
-from tests.support import WorkspaceTestCase, bib_entry
+from tests.support import WorkspaceTestCase, csv_row
 
 
 class TestMetadataMapping(WorkspaceTestCase):
-    """Bib entry -> Zenodo metadata, observed through the deposition-creation request."""
+    """CSV row -> Zenodo metadata, observed through the deposition-creation request."""
 
     def upload_one(self, **entry_fields):
         entry_fields.setdefault('key', 'nime2025_1')
         self.make_pdf(entry_fields['key'])
-        bib = self.write_bib(bib_entry(**entry_fields))
+        bib = self.write_csv(csv_row(**entry_fields))
         result = self.run_upload(bib)
         self.assertIsNone(result.exception, result.output)
         metadata = self.created_metadata()
@@ -20,10 +20,10 @@ class TestMetadataMapping(WorkspaceTestCase):
     def test_full_entry_is_mapped(self):
         md = self.upload_one(
             title='Sound Weaving',
-            authors='Doe, Jane and Roe, Richard',
-            Address='Utrecht, Netherlands',
-            Pages='10--15',
-            Abstract='An abstract.',
+            authors='Doe, Jane; Roe, Richard',
+            address='Utrecht, Netherlands',
+            pages='10--15',
+            abstract='An abstract.',
             booktitle='Proceedings of NIME',
             note='Paper Session 2',
             isbn='978-1-0000-0000-0',
@@ -54,8 +54,7 @@ class TestMetadataMapping(WorkspaceTestCase):
         self.assertEqual(md['conference_acronym'], self.app.CONFERENCE_ACRONYM)
         self.assertEqual(md['conference_dates'], self.app.CONFERENCE_DATES)
         self.assertRegex(md['publication_date'], r'^\d{4}-\d{2}-\d{2}$')
-        # Characterization: the constant is used as-is; the year parsed from the
-        # Url is computed by the program but not used.
+        # The date comes from the configuration, never from the rows.
         self.assertEqual(md['publication_date'], self.app.PUBLICATION_DATE)
 
     def test_missing_optional_fields_use_defaults(self):
@@ -65,33 +64,46 @@ class TestMetadataMapping(WorkspaceTestCase):
         self.assertEqual(md['conference_place'], 'Address')
         self.assertNotIn('partof_pages', md)
         self.assertNotIn('conference_session', md)
-        # Characterization: absent optional fields are sent as null.
+        # Characterization: absent optional columns are sent as null.
         self.assertIsNone(md['partof_title'])
         self.assertIsNone(md['imprint_isbn'])
         self.assertIsNone(md['imprint_issn'])
 
-    def test_field_names_are_case_insensitive(self):
-        # pybtex fields are case-insensitive: `url`/`Url`, `title`/`Title`, ...
+    def test_column_names_are_case_insensitive_and_extra_columns_are_ignored(self):
         self.make_pdf('nime2025_1')
-        bib = self.write_bib(
-            '@inproceedings{nime2025_1,\n'
-            '  author = {Doe, Jane},\n  TITLE = {Upper},\n'
-            '  URL = {https://nime.org/proceedings/2025/nime2025_1.pdf},\n'
-            '  abstract = {lower abstract}\n}\n'
-        )
-        result = self.run_upload(bib)
+        path = self.write_csv({
+            'KEY': 'nime2025_1', 'Pdf': 'nime2025_1.pdf', 'TITLE': 'Upper',
+            'Authors': 'Doe, Jane', 'abstract': 'lower abstract',
+            'track': 'Papers', 'status': 'garbage', 'whatever': 'x',
+        })
+        result = self.run_upload(path)
 
         self.assertIsNone(result.exception, result.output)
         md = self.created_metadata()[0]
         self.assertEqual(md['title'], 'Upper')
         self.assertEqual(md['description'], 'lower abstract')
+        self.assertNotIn('Papers', str(md))
+        self.assertNotIn('garbage', str(md))
 
-    def test_pdf_name_is_last_segment_of_url(self):
-        self.make_pdf('some_other_name')
-        bib = self.write_bib(bib_entry(
-            key='k', url='https://example.org/a/b/2024/some_other_name.pdf'
-        ))
-        result = self.run_upload(bib)
+    def test_empty_cells_are_like_missing_columns(self):
+        md = self.upload_one(abstract='', address='', pages='', note='', booktitle='')
+
+        self.assertEqual(md['description'], '---')
+        self.assertEqual(md['conference_place'], 'Address')
+        self.assertNotIn('partof_pages', md)
+        self.assertNotIn('conference_session', md)
+        self.assertIsNone(md['partof_title'])
+
+    def test_values_are_stripped(self):
+        md = self.upload_one(title='  Padded  ', address=' Oslo ')
+
+        self.assertEqual(md['title'], 'Padded')
+        self.assertEqual(md['conference_place'], 'Oslo')
+
+    def test_pdf_column_names_the_file(self):
+        self.make_file('some_other_name.pdf')
+        path = self.write_csv(csv_row(key='k', pdf='some_other_name.pdf'))
+        result = self.run_upload(path)
 
         self.assertIsNone(result.exception, result.output)
         filenames = [c['filename'] for c in self.fake.calls if 'filename' in c]
@@ -101,7 +113,7 @@ class TestMetadataMapping(WorkspaceTestCase):
 class TestAuthorNames(WorkspaceTestCase):
     def creators(self, authors):
         self.make_pdf()
-        bib = self.write_bib(bib_entry(authors=authors))
+        bib = self.write_csv(csv_row(authors=authors))
         result = self.run_upload(bib)
         self.assertIsNone(result.exception, result.output)
         return [c['name'] for c in self.created_metadata()[0]['creators']]
@@ -109,29 +121,57 @@ class TestAuthorNames(WorkspaceTestCase):
     def test_last_first_names_are_kept(self):
         self.assertEqual(self.creators('Doe, Jane'), ['Doe, Jane'])
 
-    def test_first_last_names_are_reordered_to_last_first(self):
-        self.assertEqual(self.creators('Jane Doe'), ['Doe, Jane'])
+    def test_names_are_not_reordered(self):
+        # Names are taken as written; bibcsv normalises them when converting a .bib.
+        self.assertEqual(self.creators('Jane Doe'), ['Jane Doe'])
 
-    def test_multiple_authors_keep_bib_order(self):
+    def test_multiple_authors_keep_row_order(self):
         self.assertEqual(
-            self.creators('Zed, Zoe and Alpha, Al and Mid, Max'),
+            self.creators('Zed, Zoe; Alpha, Al; Mid, Max'),
             ['Zed, Zoe', 'Alpha, Al', 'Mid, Max'],
         )
 
-    def test_braces_and_latex_umlaut_marker_are_stripped(self):
-        # Characterization: `{`, `}` and `\"` are removed, so M{\"u}ller -> Muller.
-        self.assertEqual(self.creators('M{\\"u}ller, {J}urgen'), ['Muller, Jurgen'])
+    def test_empty_segments_and_padding_are_dropped(self):
+        self.assertEqual(
+            self.creators(' Doe, Jane ;; Roe, Richard ; '), ['Doe, Jane', 'Roe, Richard']
+        )
 
-    def test_von_particle_is_preserved(self):
-        self.assertEqual(self.creators('van der Berg, Anna'), ['van der Berg, Anna'])
+    def test_braces_are_left_alone(self):
+        # Characterization: the uploader no longer cleans names (bibcsv does).
+        self.assertEqual(self.creators('{Some Group}'), ['{Some Group}'])
+
+
+class TestAffiliations(WorkspaceTestCase):
+    def creators(self, authors, affiliations):
+        self.make_pdf()
+        path = self.write_csv(csv_row(authors=authors, affiliations=affiliations))
+        result = self.run_upload(path)
+        self.assertIsNone(result.exception, result.output)
+        return self.created_metadata()[0]['creators']
+
+    def test_affiliations_are_matched_to_authors_by_position(self):
+        self.assertEqual(
+            self.creators('Doe, Jane; Roe, Rick', 'University A; Institute B'),
+            [{'name': 'Doe, Jane', 'affiliation': 'University A'},
+             {'name': 'Roe, Rick', 'affiliation': 'Institute B'}],
+        )
+
+    def test_an_author_may_have_no_affiliation(self):
+        self.assertEqual(
+            self.creators('Doe, Jane; Roe, Rick', ';Institute B'),
+            [{'name': 'Doe, Jane'}, {'name': 'Roe, Rick', 'affiliation': 'Institute B'}],
+        )
+
+    def test_empty_affiliations_give_plain_names(self):
+        self.assertEqual(self.creators('Doe, Jane', ''), [{'name': 'Doe, Jane'}])
 
 
 class TestUtf8Input(WorkspaceTestCase):
-    def test_utf8_bib_content_is_preserved(self):
-        # The README requires UTF-8 symbols (not LaTeX codes) in the .bib.
+    def test_utf8_content_is_preserved(self):
+        # The CSV must be UTF-8; a BOM (Excel) is tolerated.
         self.make_pdf()
-        bib = self.write_bib(bib_entry(
-            title='Café “quoted” ñ', authors='Müller, Jürgen and Žižek, Slavoj'
+        bib = self.write_csv(csv_row(
+            title='Café “quoted” ñ', authors='Müller, Jürgen; Žižek, Slavoj'
         ))
 
         result = self.run_upload(bib)
@@ -143,12 +183,21 @@ class TestUtf8Input(WorkspaceTestCase):
             [c['name'] for c in md['creators']], ['Müller, Jürgen', 'Žižek, Slavoj']
         )
 
+    def test_utf8_bom_is_tolerated(self):
+        self.make_pdf()
+        path = self.write_csv(csv_row(title='With BOM'), encoding='utf-8-sig')
+
+        result = self.run_upload(path)
+
+        self.assertIsNone(result.exception, result.output)
+        self.assertEqual(self.created_metadata()[0]['title'], 'With BOM')
+
 
 class TestCheckCommand(WorkspaceTestCase):
     def setUp(self):
         super().setUp()
         self.make_pdf()
-        self.bib = self.write_bib(bib_entry(title='Check Me', authors='Doe, Jane'))
+        self.bib = self.write_csv(csv_row(title='Check Me', authors='Doe, Jane'))
 
     def test_check_prints_metadata_without_network_access(self):
         result = self.run_check(self.bib)
@@ -172,18 +221,18 @@ class TestCheckCommand(WorkspaceTestCase):
         self.assertNotIn('conferencepaper', result.output)
         self.assertEqual(self.fake.calls, [])
 
-    def test_check_nonexistent_bib_is_usage_error(self):
-        result = self.run_check('upload/nope.bib')
+    def test_check_nonexistent_file_is_usage_error(self):
+        result = self.run_check('upload/nope.csv')
 
         self.assertEqual(result.exit_code, 2)
         self.assertEqual(self.fake.calls, [])
 
     def test_check_with_multiple_entries_lists_all(self):
         self.make_pdf('nime2025_2')
-        bib = self.write_bib(
-            bib_entry(key='nime2025_1', title='First'),
-            bib_entry(key='nime2025_2', title='Second'),
-            name='two.bib',
+        bib = self.write_csv(
+            csv_row(key='nime2025_1', title='First'),
+            csv_row(key='nime2025_2', title='Second'),
+            name='two.csv',
         )
         result = self.run_check(bib)
 
