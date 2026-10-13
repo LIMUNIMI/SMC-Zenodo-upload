@@ -46,7 +46,7 @@ To run the program you will need to:
 
 - place all pdfs to be uploaded into the `upload` directory
 - find your bibtex file (e.g., `nime2036_music.bib`) with metadata for the PDFs
-- place a file named `secrets.toml` in the same directory as this readme file. The `secrets.toml` file should have two records:
+- place a file named `secrets.toml` in the same directory as this readme file. The `secrets.toml` file should have two records (you can copy, rename and edit the `secrets.toml.example` scaffold):
 
   ```toml
   PUBLIC_TOKEN = 'replace-with-your-zenodo-public-token'
