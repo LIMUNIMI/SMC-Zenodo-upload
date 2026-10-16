@@ -73,8 +73,10 @@ class FakeZenodo:
     ``fail_create``/``fail_publish``/``fail_pdf`` take a status code (or a
     ``FakeResponse``) and apply to every deposition; ``fail_files`` maps an
     uploaded filename to a status code (or ``FakeResponse``). They stay set until
-    the test clears them. ``lost_publish`` makes a publish succeed on the server
-    while the answer is an error; ``doi_missing`` hides the DOI of depositions.
+    the test clears them. ``fail_listing`` and ``fail_get`` do the same for the
+    listing of a deposition's files and for the fetch of a deposition.
+    ``lost_publish`` makes a publish succeed on the server while the answer is an
+    error; ``doi_missing`` hides the DOI of depositions.
     """
 
     def __init__(self):
@@ -82,6 +84,8 @@ class FakeZenodo:
         self.fail_create = None
         self.fail_publish = None
         self.fail_pdf = None
+        self.fail_listing = None
+        self.fail_get = None
         self.fail_files = {}
         self.fail_titles = set()
         self._next_id = 1000
@@ -111,10 +115,14 @@ class FakeZenodo:
         if path.endswith('/api/deposit/depositions'):
             return FakeResponse(200, [])
         if path.endswith('/files'):
+            if self.fail_listing is not None:
+                return self._as_response(self.fail_listing)
             deposition_id = int(path.split('/depositions/')[1].split('/')[0])
             return FakeResponse(200, [
                 {'filename': name} for dep, name in self.uploaded if dep == deposition_id
             ])
+        if self.fail_get is not None:
+            return self._as_response(self.fail_get)
         deposition_id = int(path.rsplit('/', 1)[-1])
         return FakeResponse(200, {
             'id': deposition_id,

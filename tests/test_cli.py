@@ -1,7 +1,10 @@
+import os
+import subprocess
+import sys
 import unittest
 from unittest import mock
 
-from tests.support import WorkspaceTestCase, csv_row
+from tests.support import REPO_ROOT, WorkspaceTestCase, csv_row
 
 
 class TestUploadCommand(WorkspaceTestCase):
@@ -56,6 +59,31 @@ class TestUploadCommand(WorkspaceTestCase):
         result = self.run_upload(self.bib, '--nope')
 
         self.assertEqual(result.exit_code, 2)
+
+
+class TestEntryPoints(WorkspaceTestCase):
+    """Both ways of starting the program work (in a new process, from the workspace)."""
+
+    def run_process(self, *args):
+        env = dict(os.environ, PYTHONPATH=REPO_ROOT)
+        return subprocess.run(
+            [sys.executable, *args, '--help'], cwd=self.tmp, env=env,
+            capture_output=True, text=True, timeout=60
+        )
+
+    def test_started_as_a_script(self):
+        result = self.run_process(os.path.join(REPO_ROOT, 'zenodo_upload'))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('upload', result.stdout)
+        self.assertIn('check', result.stdout)
+
+    def test_started_as_a_module(self):
+        result = self.run_process('-m', 'zenodo_upload')
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('upload', result.stdout)
+        self.assertIn('check', result.stdout)
 
 
 class TestCheckCommandOptions(WorkspaceTestCase):

@@ -268,6 +268,63 @@ class TestResume(StateTestCase):
         self.assertEqual(self.row()['status'], 'done')
         self.assertEqual(len(self.fake.calls_to('/actions/publish')), 0)
 
+    def test_resume_does_not_upload_the_pdf_the_draft_already_has(self):
+        path = self.write_csv(
+            csv_row(key='nime2025_1', status='created', server='sandbox', deposition_id='555')
+        )
+        self.fake.uploaded.append((555, 'nime2025_1.pdf'))
+
+        result = self.run_upload(path)
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual([c for c in self.fake.calls if 'filename' in c], [])
+        self.assertEqual(self.post_summary(), ['publish'])
+        self.assertEqual(self.row()['status'], 'done')
+
+    def test_file_listing_failure_keeps_the_row_created(self):
+        path = self.write_csv(
+            csv_row(key='nime2025_1', status='created', server='sandbox', deposition_id='555')
+        )
+        self.fake.fail_listing = 500
+
+        result = self.run_upload(path)
+
+        self.assertEqual(result.exit_code, 1)
+        row = self.row()
+        self.assertEqual((row['status'], row['error']), ('created', 'file listing failed: HTTP 500'))
+        self.assertEqual(self.post_summary(), [])
+
+    def test_unreadable_deposition_after_publish_leaves_the_row_published(self):
+        path = self.write_csv(csv_row(key='nime2025_1'))
+        self.fake.fail_get = 500
+
+        result = self.run_upload(path)
+
+        self.assertEqual(result.exit_code, 1)
+        row = self.row()
+        self.assertEqual((row['status'], row['doi'], row['error']),
+                         ('published', '', 'doi not available'))
+
+    def test_failed_publish_with_unreadable_deposition_is_not_taken_as_published(self):
+        path = self.write_csv(csv_row(key='nime2025_1'))
+        self.fake.fail_publish = 500
+        self.fake.fail_get = 500
+
+        self.run_upload(path)
+
+        row = self.row()
+        self.assertEqual((row['status'], row['error']), ('uploaded', 'publish failed: HTTP 500'))
+
+    def test_failed_publish_with_non_json_deposition_is_not_taken_as_published(self):
+        path = self.write_csv(csv_row(key='nime2025_1'))
+        self.fake.fail_publish = 500
+        self.fake.fail_get = FakeResponse(200, text='<html>maintenance</html>')
+
+        self.run_upload(path)
+
+        row = self.row()
+        self.assertEqual((row['status'], row['error']), ('uploaded', 'publish failed: HTTP 500'))
+
     def test_create_failure_leaves_the_row_pending(self):
         path = self.write_csv(csv_row(key='nime2025_1'), csv_row(key='nime2025_2', title='Other'))
         self.fake.fail_titles = {'A Title'}
@@ -422,6 +479,7 @@ class TestSavingFailures(StateTestCase):
         self.assertIn('file is locked', result.output)
         # Stopped at the first failed save: no further depositions were started.
         self.assertEqual(len(self.created_depositions()), 1)
+        self.assertEqual(sorted(f for f in os.listdir('upload') if f.endswith('.tmp')), [])
 
     def test_run_after_an_unwritable_file_resumes_from_the_saved_state(self):
         path = self.write_csv(csv_row(key='nime2025_1'))
