@@ -71,6 +71,37 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+## Zenodo access tokens
+
+The program talks to Zenodo through personal access tokens (API keys).
+The production server (<https://zenodo.org>) and the sandbox
+(<https://sandbox.zenodo.org>) are separate sites with separate
+accounts, so you need one token for each:
+
+1. Register (or log in) on the site. For the production token, use the
+   account that should own the records and that is allowed to add them
+   to the conference's Zenodo community.
+2. Open the user menu, then *Applications* (direct link:
+   `/account/settings/applications/` on the same site), then *Personal
+   access tokens*, then *New token*.
+3. Give it any name and tick the scopes `deposit:write` and
+   `deposit:actions` (the second one is needed to publish).
+4. Create it and copy the token **immediately**: Zenodo shows it only
+   once. If you lose it, delete it and create a new one.
+5. Put the production token in `PUBLIC_TOKEN` and the sandbox one in
+   `SANDBOX_TOKEN` of `secrets.toml` (see [Run](#run)). Never commit
+   this file or share the tokens.
+
+If an upload stops with `access check failed: HTTP 401` in the `error`
+column, the token for that server is wrong, still the placeholder of
+`secrets.toml.example`, revoked, or missing one of the two scopes.
+
+The records are added to the community set in `ZENODO_COMMUNITY`
+([Conference Metadata](#conference-metadata)). Communities are separate
+on the sandbox: if the sandbox refuses the records because of the
+community, create a community with the same identifier on
+<https://sandbox.zenodo.org> and run again.
+
 ## Run
 
 You can test run the program by running:
@@ -86,7 +117,8 @@ To run the program you will need to:
   PDFs
 - place a file named `secrets.toml` in the same directory as this readme
   file. The `secrets.toml` file should have two records (you can copy,
-  rename and edit the `secrets.toml.example` scaffold):
+  rename and edit the `secrets.toml.example` scaffold; see [Zenodo
+  access tokens](#zenodo-access-tokens) to get the tokens):
 
   ```toml
   PUBLIC_TOKEN = 'replace-with-your-zenodo-public-token'
