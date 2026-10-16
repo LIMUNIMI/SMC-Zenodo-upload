@@ -1,31 +1,35 @@
 ########################################################
 '''
-Written by Benedikte Wallace, 2018, edited by Charles Martin, 2024, and Stefano Fasciani 2025-2026.
-Originally written for NIME; refactored and made conference-agnostic by Giorgio Presti, 2026.
+Written by Benedikte Wallace, 2018, edited by Charles Martin, 2024, and
+Stefano Fasciani 2025-2026. Originally written for NIME; refactored and 
+made conference-agnostic by Giorgio Presti, 2026.
 
 This script reads a CSV file (one row per paper, see README; bibcsv/bibcsv.py
-converts the conference's .bib file to it) and creates a deposition record on the Zenodo
-website. The metadata from the CSV rows are tied to the article (.pdf file) and
-are published to Zenodo resulting in the creation of a DOI. The outcome of every
-row (status, deposition id, DOI, errors) is written back to the same CSV file after each step,
-so an interrupted run can be repeated: finished rows are skipped and the others resume
-from their last completed step.
+converts the conference's .bib file to it) and creates a deposition record
+on the Zenodo website. 
+The metadata from the CSV rows are tied to the article (.pdf file) and
+are published to Zenodo resulting in the creation of a DOI. 
+The outcome of every row (status, deposition id, DOI, errors) is written
+back to the same CSV file after each step, so an interrupted run can be 
+repeated: finished rows are skipped and the others resume from their last 
+completed step.
 
 Supplementary files:
 
-If a resource contains supplementary files that should be uploaded together with the paper, each
-supplementary file should have the same base file name as the paper PDF with an additional
-suffix such as _file01, _file02, etc., appended before the extension, e.g.:
+If a resource contains supplementary files that should be uploaded together 
+with the paper, each supplementary file should have the same base file name 
+as the paper PDF with an additional suffix such as _file01, _file02, etc.,
+appended before the extension, e.g.:
 
     paper_10.pdf
     paper_10_file01.mp4
     paper_10_file02.mov
 
-Supplementary files larger than 100 MB are skipped by this script: they are NOT uploaded via
-the API. The script:
+Supplementary files larger than 100 MB are skipped by this script: they 
+are NOT uploaded via the API. The script:
   - prints a warning for each skipped file,
-  - lists the skipped filenames, ";"-separated, in the skipped_files column of the CSV, so they
-    can be uploaded manually via the Zenodo web UI.
+  - lists the skipped filenames, ";"-separated, in the skipped_files column
+    of the CSV, so they can be uploaded manually via the Zenodo web UI.
 
 Zenodo displays files alphabetically in its UI.
 '''
