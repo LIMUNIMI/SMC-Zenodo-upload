@@ -272,9 +272,10 @@ The state columns described in [Status and
 resuming](#status-and-resuming) are added by the program. Any other
 column (`track`, `year`, `url`, ...) is ignored by the upload and kept
 in the file. The whole file is checked before anything is sent: missing
-columns, empty required cells, duplicate keys, unknown `status`/`server`
-and affiliations that do not match the authors are reported together and
-nothing is uploaded. Column names are written back in lower case.
+columns, empty required cells, duplicate keys, unknown `status`/`server`,
+a started row (`status` other than `pending`) without `server` or
+`deposition_id`, and affiliations that do not match the authors are
+reported together and nothing is uploaded. Column names are written back in lower case.
 
 Special characters must be written with UTF-8 symbols and **not** in
 LaTeX code, as in the bibliography repo.

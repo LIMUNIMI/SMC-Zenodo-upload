@@ -78,6 +78,8 @@ def _check_rows(rows):
             problems.append(f"{label}: affiliations do not match the number of authors")
         if row['status'] not in STAGES:
             problems.append(f"{label}: unknown status '{row['status']}'")
+        elif row['status'] != 'pending' and not (row['server'] and row['deposition_id']):
+            problems.append(f"{label}: status '{row['status']}' needs server and deposition_id")
         if row['server'] not in ('', 'sandbox', 'production'):
             problems.append(f"{label}: unknown server '{row['server']}'")
     return problems

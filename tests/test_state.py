@@ -452,6 +452,29 @@ class TestStateValidation(StateTestCase):
         self.assertEqual(result.exit_code, 1)
         self.assertIn("unknown server 'staging'", result.output)
 
+    def test_started_row_without_server_or_deposition_id_is_rejected(self):
+        cases = {
+            'done without server': dict(status='done', deposition_id='7', doi='10.5281/zenodo.7'),
+            'created without id': dict(status='created', server='sandbox'),
+            'published without both': dict(status='published'),
+        }
+        for name, state in cases.items():
+            with self.subTest(name):
+                path = self.write_csv(csv_row(key='nime2025_1', **state))
+
+                result = self.run_upload(path)
+
+                self.assertEqual(result.exit_code, 1)
+                self.assertIn('needs server and deposition_id', result.output)
+                self.assertEqual(self.fake.calls, [])
+
+    def test_pending_row_needs_no_server_or_deposition_id(self):
+        path = self.write_csv(csv_row(key='nime2025_1', status='pending'))
+
+        result = self.run_upload(path)
+
+        self.assertEqual(result.exit_code, 0, result.output)
+
     def test_missing_pdf_stops_before_any_state_change(self):
         os.remove('upload/nime2025_2.pdf')
         path = self.write_csv(csv_row(key='nime2025_1'), csv_row(key='nime2025_2'))
