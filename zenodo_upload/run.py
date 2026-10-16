@@ -83,14 +83,15 @@ def is_done(row, target):
 def _prepare_upload(csvfilename, rows, target):
     """
     Checks and preparations before the first upload. Returns False when the run must stop
-    without uploading anything (a problem was reported, or nothing is left to do).
-    Raises CsvError if a sandbox run would overwrite rows recorded for production.
+    without uploading anything (nothing is left to do).
+    Raises CsvError if a sandbox run would overwrite rows recorded for production, or if
+    some PDFs are missing or too large.
     """
     _refuse_to_overwrite_production(rows, target)
 
     todo = [row for row in rows if not is_done(row, target)]
     if not _pdfs_are_usable(todo):
-        return False  # abort before any upload
+        raise CsvError("Upload aborted: fix the PDFs listed above.")  # before any upload
 
     if not todo:
         secho(f"Nothing to upload: all {len(rows)} rows are done on {target}.", fg='green')

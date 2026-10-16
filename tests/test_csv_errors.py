@@ -130,6 +130,7 @@ class TestMissingPdf(WorkspaceTestCase):
 
         result = self.run_upload(path)
 
+        self.assertEqual(result.exit_code, 1)
         self.assertIsNone(result.exception, result.output)
         self.assertIn('nime2025_1.pdf', result.output)
         self.assertIn('nime2025_3.pdf', result.output)
@@ -156,6 +157,7 @@ class TestOversizedPdf(WorkspaceTestCase):
 
         result = self.run_upload(self.csv)
 
+        self.assertEqual(result.exit_code, 1)
         self.assertIsNone(result.exception, result.output)
         self.assertIn('nime2025_2.pdf', result.output)
         self.assertEqual(self.fake.calls, [])

@@ -163,7 +163,8 @@ Two safeguards:
   deposition ids and DOIs); use a copy of the file for tests after the
   production upload;
 - all the checks on the file and on the PDFs (existence, size) happen
-  before the first upload.
+  before the first upload; if one fails nothing is uploaded and the
+  program exits with an error code.
 
 ## Tests
 

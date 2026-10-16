@@ -458,8 +458,9 @@ class TestStateValidation(StateTestCase):
         with open(path, 'rb') as f:
             before = f.read()
 
-        self.run_upload(path)
+        result = self.run_upload(path)
 
+        self.assertEqual(result.exit_code, 1)
         self.assertEqual(self.fake.calls, [])
         with open(path, 'rb') as f:
             self.assertEqual(f.read(), before)
