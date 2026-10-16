@@ -73,8 +73,9 @@ class FakeZenodo:
     ``fail_create``/``fail_publish``/``fail_pdf`` take a status code (or a
     ``FakeResponse``) and apply to every deposition; ``fail_files`` maps an
     uploaded filename to a status code (or ``FakeResponse``). They stay set until
-    the test clears them. ``fail_listing`` and ``fail_get`` do the same for the
-    listing of a deposition's files and for the fetch of a deposition.
+    the test clears them. ``fail_list``, ``fail_listing`` and ``fail_get`` do the same for
+    the listing of the account's depositions, of a deposition's files and for the fetch of a
+    deposition.
     ``lost_publish`` makes a publish succeed on the server while the answer is an
     error; ``doi_missing`` hides the DOI of depositions.
     """
@@ -84,6 +85,7 @@ class FakeZenodo:
         self.fail_create = None
         self.fail_publish = None
         self.fail_pdf = None
+        self.fail_list = None
         self.fail_listing = None
         self.fail_get = None
         self.fail_files = {}
@@ -113,6 +115,8 @@ class FakeZenodo:
         self.calls.append({'method': 'GET', 'url': url, 'params': params})
         path = url.split('?')[0]
         if path.endswith('/api/deposit/depositions'):
+            if self.fail_list is not None:
+                return self._as_response(self.fail_list)
             return FakeResponse(200, [])
         if path.endswith('/files'):
             if self.fail_listing is not None:

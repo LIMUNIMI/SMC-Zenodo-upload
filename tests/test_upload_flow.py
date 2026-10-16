@@ -118,6 +118,19 @@ class TestUploadFailures(WorkspaceTestCase):
         self.assertEqual(self.fake.uploaded, [(1000, 'nime2025_2.pdf')])
         self.assertEqual(self.done_rows(), [('nime2025_2.pdf', '1000', '10.5281/zenodo.1000')])
 
+    def test_refused_token_is_reported_and_nothing_is_created(self):
+        self.fake.fail_list = 401
+
+        result = self.run_upload(self.bib)
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertIsNone(result.exception, result.output)
+        self.assertIn('Cannot access Zenodo', result.output)
+        self.assertEqual(self.created_depositions(), [])
+        rows = self.read_state()
+        self.assertEqual([r['status'] for r in rows], ['pending', 'pending'])
+        self.assertEqual({r['error'] for r in rows}, {'access check failed: HTTP 401'})
+
     def test_create_failure_stops_further_calls_for_that_entry(self):
         self.fake.fail_create = 400
         self.run_upload(self.bib)

@@ -26,6 +26,11 @@ def upload_row(client, metadata, pdf_path, row, save):
     secho(f"Starting new upload for: {pdf_path} to {client.url}", fg='yellow')
     access_depositions = client.list_depositions()
     secho(f"Access depositions: {access_depositions.status_code}", fg='yellow')
+    if not succeeded(access_depositions):
+        return _fail(
+            row, save, "Cannot access Zenodo (check the token)", access_depositions,
+            "access check failed"
+        )
 
     if stage < 1 and not _create(client, metadata, pdf_path, row, save):
         return False
