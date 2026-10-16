@@ -1,5 +1,7 @@
 """State kept in the CSV file: steps, resume, server handling and safety guards."""
 
+import datetime
+import glob
 import os
 import unittest
 from unittest import mock
@@ -22,6 +24,10 @@ class StateTestCase(WorkspaceTestCase):
     def run_again(self, *args):
         self.fake.calls.clear()
         return self.run_upload(self.last_csv, *args)
+
+    @staticmethod
+    def backups(path):
+        return sorted(glob.glob(glob.escape(path) + '.*.bak'))
 
 
 class TestStateColumns(StateTestCase):
@@ -121,8 +127,32 @@ class TestStateColumns(StateTestCase):
 
         self.run_upload(path)
 
-        with open(path + '.bak', 'rb') as f:
+        [backup] = self.backups(path)
+        with open(backup, 'rb') as f:
             self.assertEqual(f.read(), original)
+
+    def test_backup_name_has_date_and_time_and_every_run_keeps_its_own(self):
+        path = self.write_csv(csv_row(key='nime2025_1'))
+        with open(path, 'rb') as f:
+            original = f.read()
+        self.fake.fail_publish = 500
+        first_run = datetime.datetime(2026, 10, 16, 14, 32, 5)
+        second_run = datetime.datetime(2026, 10, 16, 14, 32, 50)  # same minute
+
+        with mock.patch('zenodo_upload.run.datetime.datetime') as clock:
+            clock.now.return_value = first_run
+            self.run_upload(path)
+            self.fake.fail_publish = None
+            clock.now.return_value = second_run
+            self.run_again()
+
+        first_backup = f'{path}.20261016_143205.bak'
+        second_backup = f'{path}.20261016_143250.bak'
+        self.assertEqual(self.backups(path), [first_backup, second_backup])
+        with open(first_backup, 'rb') as f:
+            self.assertEqual(f.read(), original)
+        with open(second_backup, encoding='utf-8') as f:
+            self.assertIn('uploaded', f.read())  # state left by the first run
 
     def test_no_backup_for_check_or_rejected_file(self):
         path = self.write_csv(csv_row(key='nime2025_1', title=''))
@@ -130,7 +160,7 @@ class TestStateColumns(StateTestCase):
         self.run_check(path)
         self.run_upload(path)
 
-        self.assertFalse(os.path.exists(path + '.bak'))
+        self.assertEqual(self.backups(path), [])
 
 
 class TestResume(StateTestCase):
@@ -487,7 +517,7 @@ class TestStateValidation(StateTestCase):
         self.assertEqual(self.fake.calls, [])
         with open(path, 'rb') as f:
             self.assertEqual(f.read(), before)
-        self.assertFalse(os.path.exists(path + '.bak'))
+        self.assertEqual(self.backups(path), [])
 
 
 class TestSavingFailures(StateTestCase):

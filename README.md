@@ -131,7 +131,9 @@ production upload on the same file: the `server` column records which
 server each row refers to, and rows recorded for the sandbox restart
 from scratch on production.
 
-Before the first change of a run the file is copied to `<name>.csv.bak`.
+Before the first change of a run the file is copied to
+`<name>.csv.<yyyymmdd_hhmmss>.bak` (e.g. `proceedings.csv.20261016_143205.bak`),
+so every run keeps its own backup.
 
 ### Status and resuming
 

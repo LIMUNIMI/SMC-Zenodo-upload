@@ -1,5 +1,6 @@
 """Processing of a whole CSV file: pre-checks, metadata display, upload of every row."""
 
+import datetime
 import os
 import pprint
 import shutil
@@ -100,7 +101,7 @@ def _prepare_upload(csvfilename, rows, target):
     _restart_rows_of_other_server(todo, target)
 
     # Keep a copy of the file as it was before this run.
-    shutil.copy2(csvfilename, csvfilename + '.bak')
+    shutil.copy2(csvfilename, f"{csvfilename}.{datetime.datetime.now():%Y%m%d_%H%M%S}.bak")
     return True
 
 
