@@ -1,0 +1,4 @@
+key,pdf,title,authors,affiliations,abstract,pages,address,booktitle,note,isbn,issn
+smc2026_001,smc2026_001.pdf,A Complete Example Paper,"Rossi, Maria; Bianchi, Luca",University of Example; Institute of Sound Research,"An abstract may span several sentences, and may contain commas.",1--8,"Example City, Country",Proceedings of the Sound and Music Computing Conference 2026,Paper Session 1,978-0-0000-0000-0,0000-0000
+smc2026_002,smc2026_002.pdf,An Example Paper with an Unknown Affiliation,"Verdi, Anna; Neri, Paolo",;Institute of Sound Research,Only the second author has an affiliation: the first slot is left empty.,9--16,"Example City, Country",Proceedings of the Sound and Music Computing Conference 2026,Paper Session 1,978-0-0000-0000-0,0000-0000
+smc2026_003,smc2026_003.pdf,A Minimal Example Paper,"Gialli, Sara",,,,,,,,

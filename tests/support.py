@@ -22,6 +22,7 @@ from unittest import mock
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES_DIR = os.path.join(REPO_ROOT, 'tests', 'fixtures')
+EXAMPLES_DIR = os.path.join(REPO_ROOT, 'examples')
 MODULE_NAME = 'zenodo_upload.__main__'
 
 # Absolute path: the CWD changes during tests, so '' in sys.path would break.
@@ -256,13 +257,13 @@ class WorkspaceTestCase(unittest.TestCase):
         with open(os.path.join('upload', name), 'wb') as f:
             f.write(content)
 
-    def copy_fixture(self, name):
-        """Copy tests/fixtures/<name> into upload/ and create the PDFs its rows name.
+    def copy_fixture(self, name, source_dir=FIXTURES_DIR):
+        """Copy <source_dir>/<name> (default tests/fixtures) into upload/ and create the PDFs its rows name.
 
         Returns the path of the copied .csv file.
         """
         dest = os.path.join('upload', name)
-        shutil.copy(os.path.join(FIXTURES_DIR, name), dest)
+        shutil.copy(os.path.join(source_dir, name), dest)
         self.last_csv = dest
         with open(dest, encoding='utf-8', newline='') as f:
             for row in csv.DictReader(f):

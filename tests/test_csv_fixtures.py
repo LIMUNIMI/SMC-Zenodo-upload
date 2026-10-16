@@ -8,7 +8,7 @@ marked as characterization so that changing it is a deliberate decision.
 
 import unittest
 
-from tests.support import WorkspaceTestCase, csv_row
+from tests.support import EXAMPLES_DIR, WorkspaceTestCase, csv_row
 
 
 class TestValidEntries(WorkspaceTestCase):
@@ -57,6 +57,41 @@ class TestValidEntries(WorkspaceTestCase):
         self.assertEqual(
             self.done_rows(), [('nime2006_172.pdf', '1000', '10.5281/zenodo.1000')]
         )
+
+
+class TestExampleCsv(WorkspaceTestCase):
+    """The example CSV shipped in examples/ must stay valid and show what it documents."""
+
+    def setUp(self):
+        super().setUp()
+        self.example = self.copy_fixture('proceedings_example.csv', source_dir=EXAMPLES_DIR)
+
+    def test_example_passes_check(self):
+        result = self.run_check(self.example)
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(self.fake.calls, [])
+
+    def test_example_is_uploaded_with_the_documented_metadata(self):
+        result = self.run_upload(self.example)
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        full, partial, minimal = self.created_metadata()
+        self.assertEqual(
+            full['creators'],
+            [{'name': 'Rossi, Maria', 'affiliation': 'University of Example'},
+             {'name': 'Bianchi, Luca', 'affiliation': 'Institute of Sound Research'}],
+        )
+        self.assertEqual(full['conference_session'], 'Paper Session 1')
+        self.assertEqual(full['partof_pages'], '1--8')
+        self.assertEqual(
+            partial['creators'],
+            [{'name': 'Verdi, Anna'},
+             {'name': 'Neri, Paolo', 'affiliation': 'Institute of Sound Research'}],
+        )
+        self.assertEqual(minimal['creators'], [{'name': 'Gialli, Sara'}])
+        self.assertEqual(minimal['description'], '---')
+        self.assertEqual(len(self.done_rows()), 3)
 
 
 class TestKnownProblematicEntries(WorkspaceTestCase):

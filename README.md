@@ -258,6 +258,10 @@ web UI (on the server given by `server`).
 
 One row per paper, UTF-8 (a BOM from Excel is accepted),
 comma-separated, with a header row. Column names are case-insensitive.
+[`examples/proceedings_example.csv`](examples/proceedings_example.csv) is
+a working example (complete row, row with an unknown affiliation, minimal
+row): copy it to `upload/` and adapt it, together with PDFs named as in
+its `pdf` column.
 
 | Column | |
 |---|---|
