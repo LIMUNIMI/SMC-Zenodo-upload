@@ -351,3 +351,15 @@ Tests: `python -m unittest discover -s bibcsv/tests`.
 - Stefano Fasciani did some work on this in 2025 and 2026.
 - Giorgio Presti refactored the script and made it conference-agnostic
   in 2026 (originally written for NIME).
+
+## Differences from the NIME script
+
+- Conference-agnostic: everything that depends on the edition lives in
+  `conference.toml`, nothing NIME-specific is left in the code.
+- The input is a CSV file with one row per paper instead of the `.bib`
+  file; `bibcsv/bibcsv.py` converts between the two.
+- Progress is written back to the CSV (status, server, deposition id,
+  DOI, errors), so interrupted runs resume and `nime_dois.txt` is gone.
+- Fewer dependencies (no `click`, no `poetry`), code split into small
+  modules, checks on the CSV and the PDFs before any upload, and a test
+  suite that never contacts Zenodo.
