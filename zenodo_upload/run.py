@@ -50,8 +50,7 @@ def process_csv(
             continue
 
         if not os.path.exists(UPLOAD_FOLDER + pdf_name):
-            secho(f'PDF: {pdf_name} does not exist in the upload folder!', fg='red')
-            raise Exception(f'The PDF {pdf_name} did not exist in the upload folder.')
+            raise CsvError(f'The PDF {pdf_name} does not exist in the upload folder.')
 
         if print_authors:
             for author_name in split_authors(row['authors']):

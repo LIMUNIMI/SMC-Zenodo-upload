@@ -109,14 +109,16 @@ class TestInvalidCsv(WorkspaceTestCase):
 
 
 class TestMissingPdf(WorkspaceTestCase):
-    def test_check_raises_when_pdf_is_missing(self):
-        # Characterization: `check` also requires the PDFs to be present.
+    def test_check_reports_a_missing_pdf_and_fails(self):
+        # `check` also requires the PDFs to be present.
         path = self.write_csv(csv_row(key='nime2025_1'))
 
         result = self.run_check(path)
 
-        self.assertIsNotNone(result.exception)
+        self.assertEqual(result.exit_code, 1)
+        self.assertIsNone(result.exception, result.output)
         self.assertIn('nime2025_1.pdf', result.output)
+        self.assertNotIn('Traceback', result.output)
 
     def test_upload_lists_all_missing_pdfs_and_calls_nothing(self):
         self.make_pdf('nime2025_2')
