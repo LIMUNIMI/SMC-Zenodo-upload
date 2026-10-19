@@ -16,6 +16,10 @@ class Conference(NamedTuple):
     license: str
     access_right: str
     publisher: str
+    place: str
+    proceedings_title: str
+    isbn: str
+    issn: str  # empty when the proceedings have none
 
 
 def build_deposition(row, conference):
@@ -29,7 +33,6 @@ def build_deposition(row, conference):
         creators.append(creator)
 
     pages = field(row, 'pages')
-    partof_title = field(row, 'booktitle')
     conf_session = field(row, 'note')
 
     data = {
@@ -41,20 +44,22 @@ def build_deposition(row, conference):
             'conference_title': conference.title,
             'conference_acronym': conference.acronym,
             'conference_dates': conference.dates,
-            'conference_place': field(row, 'address', 'Address'),
+            'conference_place': conference.place,
             'conference_url': conference.url,
             'publication_date': conference.publication_date,
-            'partof_title': partof_title,
-            'imprint_title': partof_title,
+            'partof_title': conference.proceedings_title,
+            'imprint_title': conference.proceedings_title,
             'creators': creators,
             'communities': [{'identifier': conference.community}],  # the conference's community
             'license': conference.license,
             'access_right': conference.access_right,
             'imprint_publisher': conference.publisher,
-            'imprint_isbn': field(row, 'isbn'),
-            'imprint_issn': field(row, 'issn')
+            'imprint_isbn': conference.isbn
         }
     }
+
+    if conference.issn:
+        data['metadata']['imprint_issn'] = conference.issn
 
     if conf_session is not None:
         data['metadata']['conference_session'] = conf_session

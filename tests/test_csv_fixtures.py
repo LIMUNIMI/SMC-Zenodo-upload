@@ -31,8 +31,6 @@ class TestValidEntries(WorkspaceTestCase):
         self.assertEqual(md['title'], 'Fold Loud')
         self.assertEqual(md['creators'], [{'name': 'Paek, JooYoun'}])
         self.assertEqual(md['partof_pages'], '411')
-        self.assertEqual(md['conference_place'], 'Genova, Italy')
-        self.assertEqual(md['imprint_issn'], '2220-4806')
         self.assertEqual(md['description'], '---')  # no abstract in the entry
         self.assertNotIn('conference_session', md)
         self.assertEqual(

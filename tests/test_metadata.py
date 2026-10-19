@@ -21,27 +21,18 @@ class TestMetadataMapping(WorkspaceTestCase):
         md = self.upload_one(
             title='Sound Weaving',
             authors='Doe, Jane; Roe, Richard',
-            address='Utrecht, Netherlands',
             pages='10--15',
             abstract='An abstract.',
-            booktitle='Proceedings of EXC',
             note='Paper Session 2',
-            isbn='978-1-0000-0000-0',
-            issn='2220-4806',
         )
 
         self.assertEqual(md['title'], 'Sound Weaving')
         self.assertEqual(md['upload_type'], 'publication')
         self.assertEqual(md['publication_type'], 'conferencepaper')
         self.assertEqual(md['description'], 'An abstract.')
-        self.assertEqual(md['conference_place'], 'Utrecht, Netherlands')
         self.assertEqual(md['conference_url'], 'https://example.org')
-        self.assertEqual(md['partof_title'], 'Proceedings of EXC')
-        self.assertEqual(md['imprint_title'], 'Proceedings of EXC')
         self.assertEqual(md['partof_pages'], '10--15')
         self.assertEqual(md['conference_session'], 'Paper Session 2')
-        self.assertEqual(md['imprint_isbn'], '978-1-0000-0000-0')
-        self.assertEqual(md['imprint_issn'], '2220-4806')
         self.assertEqual(md['communities'], [{'identifier': 'example_community'}])
         self.assertEqual(
             md['creators'], [{'name': 'Doe, Jane'}, {'name': 'Roe, Richard'}]
@@ -56,6 +47,11 @@ class TestMetadataMapping(WorkspaceTestCase):
         self.assertEqual(md['license'], 'cc-by-4.0')
         self.assertEqual(md['access_right'], 'open')
         self.assertEqual(md['imprint_publisher'], 'Example Publisher')
+        self.assertEqual(md['conference_place'], 'Example City, Country')
+        self.assertEqual(md['partof_title'], 'Proceedings of the Example Conference on Sound')
+        self.assertEqual(md['imprint_title'], md['partof_title'])
+        self.assertEqual(md['imprint_isbn'], '978-0-0000-0000-0')
+        self.assertEqual(md['imprint_issn'], '0000-0000')
         self.assertRegex(md['publication_date'], r'^\d{4}-\d{2}-\d{2}$')
         # The date comes from the configuration, never from the rows.
         self.assertEqual(md['publication_date'], self.app.PUBLICATION_DATE)
@@ -64,13 +60,8 @@ class TestMetadataMapping(WorkspaceTestCase):
         md = self.upload_one()
 
         self.assertEqual(md['description'], '---')
-        self.assertEqual(md['conference_place'], 'Address')
         self.assertNotIn('partof_pages', md)
         self.assertNotIn('conference_session', md)
-        # Characterization: absent optional columns are sent as null.
-        self.assertIsNone(md['partof_title'])
-        self.assertIsNone(md['imprint_isbn'])
-        self.assertIsNone(md['imprint_issn'])
 
     def test_column_names_are_case_insensitive_and_extra_columns_are_ignored(self):
         self.make_pdf('nime2025_1')
@@ -89,19 +80,34 @@ class TestMetadataMapping(WorkspaceTestCase):
         self.assertNotIn('garbage', str(md))
 
     def test_empty_cells_are_like_missing_columns(self):
-        md = self.upload_one(abstract='', address='', pages='', note='', booktitle='')
+        md = self.upload_one(abstract='', pages='', note='')
 
         self.assertEqual(md['description'], '---')
-        self.assertEqual(md['conference_place'], 'Address')
         self.assertNotIn('partof_pages', md)
         self.assertNotIn('conference_session', md)
-        self.assertIsNone(md['partof_title'])
+
+    def test_edition_columns_of_the_csv_are_ignored(self):
+        md = self.upload_one(
+            address='Utrecht, Netherlands', booktitle='Other title',
+            isbn='111-1-1111-1111-1', issn='1111-1111',
+        )
+
+        self.assertEqual(md['conference_place'], 'Example City, Country')
+        self.assertEqual(md['partof_title'], 'Proceedings of the Example Conference on Sound')
+        self.assertEqual(md['imprint_isbn'], '978-0-0000-0000-0')
+        self.assertEqual(md['imprint_issn'], '0000-0000')
+
+    def test_issn_is_left_out_when_the_proceedings_have_none(self):
+        from zenodo_upload.metadata import build_deposition
+
+        md = build_deposition(csv_row(), self.app.CONFERENCE._replace(issn=''))['metadata']
+
+        self.assertNotIn('imprint_issn', md)
 
     def test_values_are_stripped(self):
-        md = self.upload_one(title='  Padded  ', address=' Oslo ')
+        md = self.upload_one(title='  Padded  ')
 
         self.assertEqual(md['title'], 'Padded')
-        self.assertEqual(md['conference_place'], 'Oslo')
 
     def test_pdf_column_names_the_file(self):
         self.make_file('some_other_name.pdf')

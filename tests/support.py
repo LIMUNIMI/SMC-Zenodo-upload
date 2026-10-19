@@ -42,6 +42,10 @@ CONFERENCE_TOML = (
     "LICENSE = 'cc-by-4.0'\n"
     "ACCESS_RIGHT = 'open'\n"
     "PUBLISHER = 'Example Publisher'\n"
+    "CONFERENCE_PLACE = 'Example City, Country'\n"
+    "PROCEEDINGS_TITLE = 'Proceedings of the Example Conference on Sound'\n"
+    "ISBN = '978-0-0000-0000-0'\n"
+    "ISSN = '0000-0000'\n"
 )
 
 

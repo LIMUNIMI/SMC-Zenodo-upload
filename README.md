@@ -224,6 +224,10 @@ ZENODO_COMMUNITY = 'smc'
 LICENSE = 'cc-by-4.0'
 ACCESS_RIGHT = 'open'
 PUBLISHER = 'SMC Network'
+CONFERENCE_PLACE = 'City, Country'
+PROCEEDINGS_TITLE = 'Proceedings of the Sound and Music Computing Conference 2026'
+ISBN = 'XXX-X-XXXXX-XXX-X'
+ISSN = ''
 ```
 
 `ZENODO_COMMUNITY` is the identifier of the Zenodo community the records
@@ -231,7 +235,10 @@ are added to, i.e. the last part of its URL
 (`https://zenodo.org/communities/smc/`). `LICENSE` is the Zenodo licence
 identifier and must match the licence printed on the paper template;
 `ACCESS_RIGHT` is `open` for public records; `PUBLISHER` is shown as the
-record's publisher. All nine records are required.
+record's publisher. `CONFERENCE_PLACE`, `PROCEEDINGS_TITLE`, `ISBN` and
+`ISSN` are the same for all papers, so they are not read from the CSV
+file. All records are required except `ISSN`, which can be left empty (no
+ISSN is sent then).
 
 ## Additional files
 
@@ -309,8 +316,11 @@ its `pdf` column.
 | `authors` | required, `Last, First; Last, First` |
 | `affiliations` | optional, one per author in the same order, separated by `;` (leave an author's slot empty if unknown) |
 | `abstract` | optional, `---` if empty |
-| `pages`, `note` (session), `booktitle`, `isbn`, `issn` | optional |
-| `address` | optional, conference place; `Address` if empty |
+| `pages`, `note` (session) | optional |
+
+The other columns `bibcsv` writes (`address`, `booktitle`, `isbn`, `issn`, ...)
+are ignored: these values are the same for every paper and come from
+`conference.toml`.
 
 The state columns described in [Status and
 resuming](#status-and-resuming) are added by the program. Any other

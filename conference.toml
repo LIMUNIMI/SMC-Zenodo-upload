@@ -10,3 +10,8 @@ ZENODO_COMMUNITY = 'smc'
 LICENSE = 'cc-by-4.0'
 ACCESS_RIGHT = 'open'
 PUBLISHER = 'SMC Network'
+CONFERENCE_PLACE = 'City, Country'
+PROCEEDINGS_TITLE = 'Proceedings of the Sound and Music Computing Conference 2026'
+ISBN = 'XXX-X-XXXXX-XXX-X'
+# Optional: leave out if the proceedings have no ISSN
+ISSN = '2518-3672'
