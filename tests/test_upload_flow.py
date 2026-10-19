@@ -61,6 +61,14 @@ class TestUploadHappyPath(WorkspaceTestCase):
             self.assertTrue(call['url'].startswith('https://zenodo.org/api/deposit/depositions'))
             self.assertEqual(self.call_token(call), PUBLIC_TOKEN)
 
+    def test_token_travels_in_the_header_never_in_the_url(self):
+        self.run_upload(self.bib)
+
+        self.assertTrue(self.fake.calls)
+        for call in self.fake.calls:
+            self.assertTrue(call['auth'].startswith('Bearer '))
+            self.assertNotIn('access_token', call['url'])
+
     def test_create_request_sends_json_with_metadata(self):
         self.run_full(self.bib)
 

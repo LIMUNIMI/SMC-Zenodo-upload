@@ -1,7 +1,7 @@
 """Shared helpers for the test suite.
 
-Tests never touch the network: ``requests.get``/``requests.post`` are replaced by
-:class:`FakeZenodo`. Each test runs in a temporary working directory because the
+Tests never touch the network: ``requests.Session`` is replaced by a :class:`FakeSession`
+that forwards to :class:`FakeZenodo`. Each test runs in a temporary working directory because the
 program resolves ``./upload/``, ``secrets.toml`` and ``conference.toml`` relative
 to the CWD.
 """
@@ -17,7 +17,6 @@ import shutil
 import sys
 import tempfile
 import unittest
-import urllib.parse
 from unittest import mock
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -119,8 +118,8 @@ class FakeZenodo:
         return [c for c in self.calls if c['url'].split('?')[0].endswith(suffix)]
 
     # -- patched entry points ------------------------------------------------
-    def get(self, url, params=None, **kwargs):
-        self.calls.append({'method': 'GET', 'url': url, 'params': params})
+    def get(self, url, auth=None, **kwargs):
+        self.calls.append({'method': 'GET', 'url': url, 'auth': auth})
         path = url.split('?')[0]
         if path.endswith('/api/deposit/depositions'):
             if self.fail_list is not None:
@@ -142,9 +141,9 @@ class FakeZenodo:
             'submitted': deposition_id in self.published,
         })
 
-    def post(self, url, params=None, json=None, headers=None, data=None, files=None, **kwargs):
+    def post(self, url, auth=None, json=None, headers=None, data=None, files=None, **kwargs):
         record = {
-            'method': 'POST', 'url': url, 'params': params, 'json': json,
+            'method': 'POST', 'url': url, 'auth': auth, 'json': json,
             'headers': headers, 'data': data,
         }
         self.calls.append(record)
@@ -188,6 +187,20 @@ class FakeZenodo:
         raise AssertionError(f'Unexpected POST to {url}')
 
 
+class FakeSession:
+    """Stand-in for requests.Session: forwards to the FakeZenodo, with the session's token."""
+
+    def __init__(self, fake):
+        self.headers = {}
+        self._fake = fake
+
+    def get(self, url, **kwargs):
+        return self._fake.get(url, auth=self.headers.get('Authorization'), **kwargs)
+
+    def post(self, url, **kwargs):
+        return self._fake.post(url, auth=self.headers.get('Authorization'), **kwargs)
+
+
 def csv_row(key='nime2025_1', title='A Title', authors='Doe, Jane', pdf=None, **fields):
     """Build a CSV row (dict). ``None`` values become empty cells.
 
@@ -224,10 +237,9 @@ class WorkspaceTestCase(unittest.TestCase):
                 f.write(CONFERENCE_TOML)
 
         self.fake = FakeZenodo()
-        for name, target in (('get', self.fake.get), ('post', self.fake.post)):
-            patcher = mock.patch(f'requests.{name}', side_effect=target)
-            patcher.start()
-            self.addCleanup(patcher.stop)
+        patcher = mock.patch('requests.Session', side_effect=lambda: FakeSession(self.fake))
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
         if self.write_secrets and self.write_conference:
             self.app = importlib.import_module(MODULE_NAME)
@@ -321,11 +333,8 @@ class WorkspaceTestCase(unittest.TestCase):
 
     @staticmethod
     def call_token(call):
-        """Access token of a recorded call (query param or part of the URL)."""
-        if call.get('params') and 'access_token' in call['params']:
-            return call['params']['access_token']
-        query = urllib.parse.urlparse(call['url']).query
-        return urllib.parse.parse_qs(query)['access_token'][0]
+        """Access token of a recorded call (from its Authorization header)."""
+        return call['auth'].removeprefix('Bearer ')
 
     # -- invocation helpers -----------------------------------------------------
     def run_cli(self, *argv):

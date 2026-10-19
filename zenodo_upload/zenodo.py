@@ -19,7 +19,8 @@ class ZenodoClient:
     def __init__(self, target, url, token):
         self.target = target  # 'production' or 'sandbox'
         self.url = url
-        self.token = token
+        self.session = requests.Session()
+        self.session.headers['Authorization'] = f'Bearer {token}'
 
     @classmethod
     def for_target(cls, target, secrets):
@@ -28,39 +29,34 @@ class ZenodoClient:
         return cls(target, url, secrets[token_name])
 
     @property
-    def _auth(self):
-        return {'access_token': self.token}
-
-    @property
     def _depositions(self):
         return f"{self.url}/api/deposit/depositions"
 
     def list_depositions(self):
-        return requests.get(self._depositions, params=self._auth)
+        return self.session.get(self._depositions)
 
     def create(self, metadata):
-        return requests.post(
+        return self.session.post(
             self._depositions,
-            params=self._auth,
             json=metadata,
             headers={"Content-Type": "application/json"}
         )
 
     def get(self, deposition_id):
-        return requests.get(f"{self._depositions}/{deposition_id}", params=self._auth)
+        return self.session.get(f"{self._depositions}/{deposition_id}")
 
     def list_files(self, deposition_id):
-        return requests.get(f"{self._depositions}/{deposition_id}/files", params=self._auth)
+        return self.session.get(f"{self._depositions}/{deposition_id}/files")
 
     def upload_file(self, deposition_id, filename, path):
-        url = f"{self._depositions}/{deposition_id}/files?access_token={self.token}"
         with open(path, 'rb') as f:
-            return requests.post(url, data={'filename': filename}, files={'file': f})
+            return self.session.post(
+                f"{self._depositions}/{deposition_id}/files",
+                data={'filename': filename}, files={'file': f}
+            )
 
     def publish(self, deposition_id):
-        return requests.post(
-            f"{self._depositions}/{deposition_id}/actions/publish", params=self._auth
-        )
+        return self.session.post(f"{self._depositions}/{deposition_id}/actions/publish")
 
     def is_published(self, deposition_id):
         """True if Zenodo reports the deposition as already published."""
