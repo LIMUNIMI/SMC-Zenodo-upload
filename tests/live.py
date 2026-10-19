@@ -18,6 +18,12 @@ from zenodo_upload.zenodo import TIMEOUT, ZenodoClient
 SANDBOX_URL = 'https://sandbox.zenodo.org'
 MARKER = '[TEST zenodo_upload]'
 
+# The paper the live tests upload (the rest of its metadata comes from the test conference).
+PAPER = dict(
+    authors='Doe, Jane; Roe, Richard', affiliations='University A;', abstract='An abstract.',
+    pages='1--8', note='Paper Session 1',
+)
+
 
 def _repo_toml(name):
     try:
@@ -76,11 +82,7 @@ class LiveTestCase(WorkspaceTestCase):
         self.make_pdf('p1')
         for name in extra_files:
             self.make_file(name)
-        row = dict(
-            key='p1', title=self.title, authors='Doe, Jane; Roe, Richard',
-            affiliations='University A;', abstract='An abstract.', pages='1--8',
-            note='Paper Session 1',
-        )
+        row = dict(key='p1', title=self.title, **PAPER)
         row.update(fields)
         path = self.write_csv(csv_row(**row))
         result = self.run_upload(path)
@@ -108,6 +110,68 @@ class LiveTestCase(WorkspaceTestCase):
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(rows)
+
+    def published_record(self, record_id):
+        """
+        A published record as Zenodo stores and shows it (InvenioRDM JSON: the older record API
+        leaves out publisher and part-of); None if there is no such record.
+        """
+        response = self.client.session.get(
+            f'{SANDBOX_URL}/api/records/{record_id}', timeout=TIMEOUT,
+            headers={'Accept': 'application/vnd.inveniordm.v1+json'},
+        )
+        if response.status_code == 404:
+            return None
+        self.assertTrue(response.ok, response.text)
+        return response.json()
+
+    def assert_published_metadata(self, record):
+        """The published record holds the metadata the program sends for PAPER."""
+        conference = self.app.CONFERENCE
+        metadata, fields = record['metadata'], record['custom_fields']
+
+        self.assertEqual(record['status'], 'published')
+        self.assertTrue(metadata['title'].startswith(MARKER), metadata['title'])
+        self.assertEqual(metadata['description'], PAPER['abstract'])
+        self.assertEqual(metadata['publication_date'], conference.publication_date)
+        self.assertEqual(metadata['publisher'], conference.publisher)
+        self.assertEqual(metadata['resource_type']['id'], 'publication-conferencepaper')
+        self.assertEqual([right['id'] for right in metadata['rights']], [conference.license])
+        self.assertEqual(
+            [
+                (c['person_or_org']['name'], [a['name'] for a in c.get('affiliations', [])])
+                for c in metadata['creators']
+            ],
+            [('Doe, Jane', ['University A']), ('Roe, Richard', [])],
+        )
+        self.assertEqual(fields['imprint:imprint'], {
+            'title': conference.proceedings_title, 'isbn': conference.isbn,
+            'pages': PAPER['pages'],
+        })  # no ISSN: Zenodo has nowhere to keep it
+        self.assertEqual(fields['meeting:meeting'], {
+            'title': conference.title, 'acronym': conference.acronym,
+            'dates': conference.dates, 'place': conference.place, 'url': conference.url,
+            'session': PAPER['note'],
+        })
+
+    def community_state(self, record):
+        """'included' or 'requested' (inclusion request still open) for the record's community."""
+        response = self.client.session.get(
+            f'{SANDBOX_URL}/api/communities/{self.community}', timeout=TIMEOUT
+        )
+        self.assertTrue(response.ok, response.text)
+        community_id = response.json()['id']
+        if community_id in record['parent'].get('communities', {}).get('ids', []):
+            return 'included'
+        response = self.client.session.get(
+            f"{SANDBOX_URL}/api/records/{record['id']}/requests", timeout=TIMEOUT
+        )
+        self.assertTrue(response.ok, response.text)
+        for request in response.json()['hits']['hits']:
+            if (request['type'] == 'community-inclusion' and request['is_open']
+                    and request['receiver'] == {'community': community_id}):
+                return 'requested'
+        return 'none'
 
     def require_community(self):
         """Skip the test unless the conference's community exists on the sandbox."""

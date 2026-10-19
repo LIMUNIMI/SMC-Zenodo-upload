@@ -244,7 +244,10 @@ python -m unittest tests.test_live_sandbox -v
 
 They use the community set in `conference.toml`, which must exist on the
 sandbox. They create drafts titled `[TEST zenodo_upload] ...` and delete
-them at the end of every test.
+them at the end of every test. A read-only test also checks the metadata
+of a record published earlier on the sandbox (`REFERENCE_RECORD_ID` in
+the test file), as Zenodo stores and shows it, and that the record is in
+the community or waits for the community's review.
 
 One more test goes through `upload` and `publish` up to the DOI. It
 leaves a **permanent record** on the sandbox (published records cannot be

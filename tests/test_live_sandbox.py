@@ -182,6 +182,35 @@ class TestLiveDrafts(LiveTestCase):
         self.assertFalse(self.deposition()['submitted'])
 
 
+# The record published on the sandbox by TestLivePublish (last run 2026-10-19). If the sandbox is
+# reset, run that test again (see README) and put the new id here.
+REFERENCE_RECORD_ID = 622796
+
+
+class TestLiveRecord(LiveTestCase):
+    """Read-only: the published reference record has the metadata the program sends."""
+
+    def setUp(self):
+        super().setUp()
+        self.record = self.published_record(REFERENCE_RECORD_ID)
+        if self.record is None:
+            self.skipTest(
+                f'reference record {REFERENCE_RECORD_ID} not found on the sandbox: run '
+                'TestLivePublish (ZENODO_LIVE_PUBLISH=1) and update REFERENCE_RECORD_ID'
+            )
+
+    def test_the_published_metadata_is_correct(self):
+        self.assert_published_metadata(self.record)
+
+    def test_the_record_has_its_doi(self):
+        self.assertEqual(
+            self.record['pids']['doi']['identifier'], f'10.5072/zenodo.{REFERENCE_RECORD_ID}'
+        )
+
+    def test_the_record_is_in_the_community_or_waits_for_its_review(self):
+        self.assertIn(self.community_state(self.record), ('included', 'requested'))
+
+
 @unittest.skipUnless(
     os.environ.get('ZENODO_LIVE_PUBLISH') == '1',
     'creates a permanent record on the sandbox: set ZENODO_LIVE_PUBLISH=1 to run it',
@@ -208,6 +237,10 @@ class TestLivePublish(LiveTestCase):
         self.assertEqual(self.file_names(), {'p1.pdf', 'p1_file01.txt'})
         # What the program reads from Zenodo, and FakeZenodo imitates.
         self.assertLessEqual({'id', 'doi', 'submitted', 'state'}, set(record))
+
+        self.assert_published_metadata(self.published_record(deposition_id))
+        self.assertIn(self.community_state(self.published_record(deposition_id)),
+                      ('included', 'requested'))
 
         again = self.run_publish(path)
 
