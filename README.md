@@ -219,13 +219,19 @@ PUBLICATION_DATE = 'YYYY-MM-DD'
 CONFERENCE_DATES = 'D Month - D Month, YYYY'
 CONFERENCE_TITLE = 'Sound and Music Computing Conference'
 CONFERENCE_ACRONYM = 'SMC'
-CONFERENCE_URL = 'https://example.org'
+CONFERENCE_URL = 'https://smcnetwork.org/'
 ZENODO_COMMUNITY = 'smc'
+LICENSE = 'cc-by-4.0'
+ACCESS_RIGHT = 'open'
+PUBLISHER = 'SMC Network'
 ```
 
 `ZENODO_COMMUNITY` is the identifier of the Zenodo community the records
 are added to, i.e. the last part of its URL
-(`https://zenodo.org/communities/smc/`). All six records are required.
+(`https://zenodo.org/communities/smc/`). `LICENSE` is the Zenodo licence
+identifier and must match the licence printed on the paper template;
+`ACCESS_RIGHT` is `open` for public records; `PUBLISHER` is shown as the
+record's publisher. All nine records are required.
 
 ## Additional files
 

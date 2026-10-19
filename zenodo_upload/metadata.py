@@ -13,6 +13,9 @@ class Conference(NamedTuple):
     acronym: str
     url: str
     community: str
+    license: str
+    access_right: str
+    publisher: str
 
 
 def build_deposition(row, conference):
@@ -45,6 +48,9 @@ def build_deposition(row, conference):
             'imprint_title': partof_title,
             'creators': creators,
             'communities': [{'identifier': conference.community}],  # the conference's community
+            'license': conference.license,
+            'access_right': conference.access_right,
+            'imprint_publisher': conference.publisher,
             'imprint_isbn': field(row, 'isbn'),
             'imprint_issn': field(row, 'issn')
         }

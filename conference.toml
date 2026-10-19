@@ -3,6 +3,10 @@ PUBLICATION_DATE = 'YYYY-MM-DD'
 CONFERENCE_DATES = '5 November - 7 November, 2026'
 CONFERENCE_TITLE = 'Sound and Music Computing Conference'
 CONFERENCE_ACRONYM = 'SMC'
-CONFERENCE_URL = 'https://example.org'
+CONFERENCE_URL = 'https://smcnetwork.org/'
 # Identifier of the Zenodo community the records are added to (zenodo.org/communities/<identifier>/)
 ZENODO_COMMUNITY = 'smc'
+# Zenodo licence identifier: must match the licence printed on the paper template (cc-by-3.0 or cc-by-4.0)
+LICENSE = 'cc-by-4.0'
+ACCESS_RIGHT = 'open'
+PUBLISHER = 'SMC Network'

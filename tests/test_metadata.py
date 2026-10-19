@@ -53,6 +53,9 @@ class TestMetadataMapping(WorkspaceTestCase):
         self.assertEqual(md['conference_title'], self.app.CONFERENCE_TITLE)
         self.assertEqual(md['conference_acronym'], self.app.CONFERENCE_ACRONYM)
         self.assertEqual(md['conference_dates'], self.app.CONFERENCE_DATES)
+        self.assertEqual(md['license'], 'cc-by-4.0')
+        self.assertEqual(md['access_right'], 'open')
+        self.assertEqual(md['imprint_publisher'], 'Example Publisher')
         self.assertRegex(md['publication_date'], r'^\d{4}-\d{2}-\d{2}$')
         # The date comes from the configuration, never from the rows.
         self.assertEqual(md['publication_date'], self.app.PUBLICATION_DATE)

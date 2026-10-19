@@ -39,6 +39,9 @@ CONFERENCE_TOML = (
     "CONFERENCE_ACRONYM = 'EXC'\n"
     "CONFERENCE_URL = 'https://example.org'\n"
     "ZENODO_COMMUNITY = 'example_community'\n"
+    "LICENSE = 'cc-by-4.0'\n"
+    "ACCESS_RIGHT = 'open'\n"
+    "PUBLISHER = 'Example Publisher'\n"
 )
 
 
