@@ -5,7 +5,6 @@ import os
 
 from zenodo_upload.console import print_response, secho
 from zenodo_upload.rows import STAGES, record
-from zenodo_upload.zenodo import succeeded
 
 UPLOAD_FOLDER = './upload/'
 
@@ -65,7 +64,7 @@ def _fail(row, save, message, response, error, show_response=True):
 
 def _create(client, metadata, pdf_path, row, save):
     new_deposition = client.create(metadata)
-    if not succeeded(new_deposition):
+    if not new_deposition.ok:
         return _fail(
             row, save, f"Error happened during submission {pdf_path}", new_deposition,
             "create failed"
@@ -85,7 +84,7 @@ def _upload_files(client, pdf_path, row, save, resumed):
     already_uploaded = set()
     if resumed:
         listing = client.list_files(submission_id)
-        if not succeeded(listing):
+        if not listing.ok:
             return _fail(
                 row, save, f"Error happened while listing the files of {pdf_path}", listing,
                 "file listing failed", show_response=False
@@ -96,7 +95,7 @@ def _upload_files(client, pdf_path, row, save, resumed):
         add_file = client.upload_file(
             submission_id, pdf_path, os.path.join(UPLOAD_FOLDER, pdf_path)
         )
-        if not succeeded(add_file):
+        if not add_file.ok:
             return _fail(
                 row, save, f"Error happened during file upload of {pdf_path}", add_file,
                 "file upload failed"
@@ -139,7 +138,7 @@ def _upload_supplementary(client, submission_id, pdf_path, already_uploaded):
         add_file = client.upload_file(submission_id, name, full_path)
 
         # If upload of file is unsuccessful, warn and continue with the other files
-        if not succeeded(add_file):
+        if not add_file.ok:
             secho(
                 f"Error happened during supplementary file upload of {name}, "
                 f"status code: {add_file.status_code}",
@@ -161,7 +160,7 @@ def _publish(client, pdf_path, row, save):
     publish_record = client.publish(submission_id)
 
     # If publish unsuccessful, abort (unless the answer was lost and it did get published)
-    if not succeeded(publish_record):
+    if not publish_record.ok:
         secho(
             f"Error happened during publish, status code: {publish_record.status_code}",
             fg='red'
@@ -181,7 +180,7 @@ def _confirm_doi(client, pdf_path, row, save):
     submission_id = row['deposition_id']
     retrieved_deposition = client.get(submission_id)
     retrieved_doi = None
-    if succeeded(retrieved_deposition):
+    if retrieved_deposition.ok:
         retrieved_doi = retrieved_deposition.json().get('doi')
     if not retrieved_doi:
         secho(

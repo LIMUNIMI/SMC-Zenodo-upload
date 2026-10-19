@@ -60,13 +60,18 @@ class CliResult:
 class FakeResponse:
     """Minimal stand-in for requests.Response."""
 
-    def __init__(self, status_code=200, payload=None, text=None):
+    def __init__(self, status_code=200, payload=None, text=None, headers=None):
         self.status_code = status_code
+        self.headers = headers or {}
         self._payload = payload
         if text is not None:
             self.text = text
         else:
             self.text = json.dumps(payload) if payload is not None else ''
+
+    @property
+    def ok(self):
+        return self.status_code < 400
 
     def json(self):
         if self._payload is None:
@@ -238,6 +243,11 @@ class WorkspaceTestCase(unittest.TestCase):
 
         self.fake = FakeZenodo()
         patcher = mock.patch('requests.Session', side_effect=lambda: FakeSession(self.fake))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        self.sleeps = []  # the waits between retries, which do not really happen
+        patcher = mock.patch('zenodo_upload.zenodo.time.sleep', side_effect=self.sleeps.append)
         patcher.start()
         self.addCleanup(patcher.stop)
 

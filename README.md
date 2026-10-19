@@ -202,7 +202,10 @@ On a new run each row continues from its last step: a `created` row
 reuses its Zenodo draft and only uploads the missing files (`upload`
 ends with `uploaded`); with `publish`, an `uploaded` row is published and
 a `published` row only reads its DOI (`publish` ends with `done`). A
-publish whose answer got lost is recognised and not repeated. At the end
+publish whose answer got lost is recognised and not repeated. Requests
+that Zenodo answers with `429` (too many requests), reads that get a
+`5xx` or a network error are retried automatically (up to 5 attempts,
+with growing waits); other failures are recorded in the row as above. At the end
 the program prints a summary and exits with an error code if some rows
 are not completed.
 

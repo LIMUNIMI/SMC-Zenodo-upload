@@ -194,14 +194,14 @@ class TestUploadFailures(WorkspaceTestCase):
         self.assertEqual(self.done_rows(), [])
         self.assertNotIn('PUBLISHED', result.output)
 
-    def test_status_210_is_success_and_211_is_failure(self):
-        self.fake.fail_create = FakeResponse(210, {'id': 4242})
+    def test_2xx_is_success_and_4xx_is_failure(self):
+        self.fake.fail_create = FakeResponse(211, {'id': 4242})
         result = self.run_full(self.bib)
         self.assertNotIn('Error happened during submission', result.output)
 
         self.reload_app()
         self.fake.calls.clear()
-        self.fake.fail_create = FakeResponse(211, {'message': 'nope'})
+        self.fake.fail_create = FakeResponse(400, {'message': 'nope'})
         self.write_csv(  # start again from clean rows
             csv_row(key='nime2025_1', title='First'),
             csv_row(key='nime2025_2', title='Second'),
