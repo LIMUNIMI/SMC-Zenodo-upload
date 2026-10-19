@@ -2,13 +2,13 @@ import importlib
 import os
 import sys
 import unittest
+from unittest import mock
 
 from tests.support import CONFERENCE_TOML, MB, MODULE_NAME, WorkspaceTestCase, csv_row
 
 
 class TestImportSideEffects(WorkspaceTestCase):
-    # The module reads conference.toml and secrets.toml at import time and
-    # writes nothing.
+    # The module reads conference.toml at import time and writes nothing.
 
     def test_import_creates_no_files(self):
         self.assertEqual(
@@ -18,14 +18,26 @@ class TestImportSideEffects(WorkspaceTestCase):
     def test_missing_token_key_fails_when_that_server_is_used(self):
         with open('secrets.toml', 'w') as f:
             f.write("PUBLIC_TOKEN = 'only-public'\n")
-        sys.modules.pop(MODULE_NAME)
-        self.app = importlib.import_module(MODULE_NAME)
         self.make_pdf()
         bib = self.write_csv(csv_row())
-        result = self.run_upload(bib)  # sandbox -> SANDBOX_TOKEN is missing
+        with mock.patch('builtins.input') as prompt:
+            result = self.run_cli('upload', bib)  # sandbox -> SANDBOX_TOKEN is missing
 
-        self.assertIsInstance(result.exception, KeyError)
+        self.assertEqual(result.exit_code, 1)
+        self.assertIsNone(result.exception, result.output)
+        self.assertIn('SANDBOX_TOKEN', result.output)
+        prompt.assert_not_called()
         self.assertEqual(self.fake.calls, [])
+
+    def test_only_the_token_of_the_chosen_server_is_needed(self):
+        with open('secrets.toml', 'w') as f:
+            f.write("PUBLIC_TOKEN = 'only-public'\n")
+        self.make_pdf()
+        bib = self.write_csv(csv_row())
+
+        result = self.run_upload(bib, '--production')
+
+        self.assertEqual(result.exit_code, 0, result.output)
 
 
 class TestInProcessState(WorkspaceTestCase):
@@ -44,9 +56,30 @@ class TestInProcessState(WorkspaceTestCase):
 class TestImportWithoutSecrets(WorkspaceTestCase):
     write_secrets = False
 
-    def test_missing_secrets_file_fails_at_import(self):
-        with self.assertRaises(FileNotFoundError):
-            importlib.import_module(MODULE_NAME)
+    def test_secrets_file_is_not_needed_to_import_or_to_check(self):
+        app = importlib.import_module(MODULE_NAME)
+        self.make_pdf()
+        path = self.write_csv(csv_row())
+        self.app = app
+
+        result = self.run_check(path)
+
+        self.assertEqual(result.exit_code, 0, result.output)
+
+    def test_upload_and_publish_explain_the_missing_file_before_the_prompt(self):
+        self.app = importlib.import_module(MODULE_NAME)
+        self.make_pdf()
+        path = self.write_csv(csv_row())
+
+        for command in ('upload', 'publish'):
+            with self.subTest(command=command), mock.patch('builtins.input') as prompt:
+                result = self.run_cli(command, path)
+
+                self.assertEqual(result.exit_code, 1)
+                self.assertIsNone(result.exception, result.output)
+                self.assertIn('secrets.toml not found', result.output)
+                prompt.assert_not_called()
+        self.assertEqual(self.fake.calls, [])
 
 
 class TestImportWithoutConferenceFile(WorkspaceTestCase):

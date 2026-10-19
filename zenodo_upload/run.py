@@ -33,6 +33,14 @@ def process_csv(
     fieldnames, rows = read_rows(csvfilename)
     target = 'production' if production_zenodo else 'sandbox'
 
+    if action == 'check':
+        missing = _missing_pdfs(rows)
+        if missing:
+            raise CsvError(
+                "The following PDFs referenced in the CSV file do not exist in the upload "
+                "folder:\n  " + "\n  ".join(missing)
+            )
+
     def save():
         save_rows(csvfilename, fieldnames, rows)
 
@@ -73,9 +81,6 @@ def process_csv(
                 else:
                     failed += 1
             continue
-
-        if not os.path.exists(UPLOAD_FOLDER + pdf_name):
-            raise CsvError(f'The PDF {pdf_name} does not exist in the upload folder.')
 
         if print_authors:
             for author_name in split_authors(row['authors']):
@@ -180,19 +185,24 @@ def _refuse_to_overwrite_production(rows, target):
         )
 
 
+def _missing_pdfs(rows):
+    """Sorted names of the PDFs of `rows` that are not in the upload folder."""
+    return sorted({
+        row['pdf'] for row in rows
+        if not os.path.exists(os.path.join(UPLOAD_FOLDER, row['pdf']))
+    })
+
+
 def _pdfs_are_usable(todo):
     """Check that no PDF of the rows still to do is missing or exceeds MAX_PDF_BYTES."""
+    missing_pdfs = _missing_pdfs(todo)
     oversized_pdfs = []
-    missing_pdfs = []
     for row in todo:
         pdf_name = row['pdf']
-        pdf_path = os.path.join(UPLOAD_FOLDER, pdf_name)
-
-        if not os.path.exists(pdf_path):
-            missing_pdfs.append(pdf_name)
+        if pdf_name in missing_pdfs:
             continue
 
-        size = os.path.getsize(pdf_path)
+        size = os.path.getsize(os.path.join(UPLOAD_FOLDER, pdf_name))
         if size > MAX_PDF_BYTES:
             oversized_pdfs.append((pdf_name, size))
 
@@ -201,7 +211,7 @@ def _pdfs_are_usable(todo):
             "The following PDFs referenced in the CSV file do not exist in the upload folder:",
             fg='red'
         )
-        for name in sorted(set(missing_pdfs)):
+        for name in missing_pdfs:
             secho(f"  - {name}", fg='red')
         secho("Fix the missing files before running the upload.", fg='red')
         return False

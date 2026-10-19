@@ -2,7 +2,10 @@
 
 import datetime
 import re
+import tomllib
 import urllib.parse
+
+from zenodo_upload.zenodo import SERVERS
 
 ACCESS_RIGHTS = ('open', 'embargoed', 'restricted', 'closed')
 PLACEHOLDER_HOSTS = ('example.org', 'example.com')
@@ -16,7 +19,7 @@ KEYS = {
 
 
 class ConfigError(Exception):
-    """conference.toml has unusable values; the message lists them all."""
+    """A configuration file (conference.toml, secrets.toml) is unusable; the message says why."""
 
 
 def validate_conference(conference):
@@ -53,6 +56,27 @@ def validate_conference(conference):
 
     if problems:
         raise ConfigError("conference.toml:\n  " + "\n  ".join(problems))
+
+
+def load_secrets(target):
+    """
+    The tokens of secrets.toml. Raises ConfigError if the file is missing or invalid, or has no
+    token for `target` ('sandbox' or 'production').
+    """
+    try:
+        with open("secrets.toml", "rb") as f:
+            secrets = tomllib.load(f)
+    except FileNotFoundError:
+        raise ConfigError(
+            "secrets.toml not found: copy secrets.toml.example to secrets.toml and put "
+            "your Zenodo tokens in it."
+        ) from None
+    except tomllib.TOMLDecodeError as error:
+        raise ConfigError(f"secrets.toml: {error}") from error
+    token_name = SERVERS[target][1]
+    if not secrets.get(token_name):
+        raise ConfigError(f"secrets.toml: {token_name} is missing or empty (needed for {target}).")
+    return secrets
 
 
 def _is_isbn(value):

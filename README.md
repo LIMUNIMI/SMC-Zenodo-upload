@@ -118,7 +118,8 @@ To run the program you will need to:
 - place all pdfs to be uploaded into the `upload` directory
 - find your CSV file (e.g., `proceedings.csv`) with metadata for the
   PDFs
-- place a file named `secrets.toml` in the same directory as this readme
+- to upload or publish (`check` does not need it), place a file named
+  `secrets.toml` in the same directory as this readme
   file. The `secrets.toml` file should have two records (you can copy,
   rename and edit the `secrets.toml.example` scaffold; see [Zenodo
   access tokens](#zenodo-access-tokens) to get the tokens):
@@ -129,7 +130,8 @@ To run the program you will need to:
   ```
 
 Once you have your data in place, you can view the metadata that will be
-created (without uploading) by running:
+created (without uploading) by running the following; all PDFs missing
+from `upload` are listed together:
 
 ```bash
 python zenodo_upload check upload/proceedings.csv

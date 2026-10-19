@@ -45,7 +45,7 @@ if __package__ in (None, ''):
     # Started as `python zenodo_upload`: make the package importable by its absolute name.
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from zenodo_upload.config import ConfigError, validate_conference
+from zenodo_upload.config import ConfigError, load_secrets, validate_conference
 from zenodo_upload.console import secho
 from zenodo_upload.metadata import Conference
 from zenodo_upload.rows import CsvError, STAGES, STATE_COLUMNS, read_rows
@@ -75,10 +75,6 @@ CONFERENCE = Conference(
     CONFERENCE_PLACE, PROCEEDINGS_TITLE, ISBN, ISSN
 )
 
-# Tokens, replace with public and sandbox tokens from Zenodo:
-with open("secrets.toml", "rb") as f:
-    secret_data = tomllib.load(f)
-
 
 def upload(csvfile, production):
     """Process metadata from a CSV file and upload the drafts to Zenodo."""
@@ -92,6 +88,7 @@ def publish(csvfile, production):
 
 def _send(csvfile, production, action):
     read_rows(csvfile)  # fail on an unusable file before asking for confirmation
+    secrets = load_secrets('production' if production else 'sandbox')  # tokens, same reason
     verb = 'uploading' if action == 'upload' else 'PUBLISHING'
     if production:
         secho(
@@ -108,7 +105,7 @@ def _send(csvfile, production, action):
     return process_csv(
         csvfile,
         CONFERENCE,
-        secret_data,
+        secrets,
         action=action,
         verbose=False,
         print_authors=False,
@@ -121,7 +118,7 @@ def check(csvfile, authors):
     return process_csv(
         csvfile,
         CONFERENCE,
-        secret_data,
+        None,  # `check` never talks to Zenodo, so it needs no tokens
         action='check',
         verbose=not authors,
         print_authors=authors,

@@ -120,6 +120,23 @@ class TestMissingPdf(WorkspaceTestCase):
         self.assertIn('nime2025_1.pdf', result.output)
         self.assertNotIn('Traceback', result.output)
 
+    def test_check_lists_all_missing_pdfs(self):
+        self.make_pdf('nime2025_2')
+        path = self.write_csv(
+            csv_row(key='nime2025_1'),
+            csv_row(key='nime2025_2'),
+            csv_row(key='nime2025_3'),
+        )
+
+        result = self.run_check(path)
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertIsNone(result.exception, result.output)
+        self.assertIn('nime2025_1.pdf', result.output)
+        self.assertIn('nime2025_3.pdf', result.output)
+        self.assertNotIn('nime2025_2.pdf', result.output)
+        self.assertNotIn("'title'", result.output)  # no metadata is printed before failing
+
     def test_upload_lists_all_missing_pdfs_and_calls_nothing(self):
         self.make_pdf('nime2025_2')
         path = self.write_csv(
