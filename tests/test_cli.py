@@ -33,6 +33,14 @@ class TestUploadCommand(WorkspaceTestCase):
         self.assertEqual(self.fake.calls, [])
         self.assertNotEqual(result.exit_code, 0)
 
+    def test_user_must_confirm_with_enter_before_publish(self):
+        with mock.patch('builtins.input', side_effect=KeyboardInterrupt) as prompt:
+            result = self.run_cli('publish', self.bib)
+
+        prompt.assert_called_once()
+        self.assertEqual(self.fake.calls, [])
+        self.assertNotEqual(result.exit_code, 0)
+
     def test_confirmation_is_requested_once_per_run(self):
         self.make_pdf('nime2025_2')
         bib = self.write_csv(
@@ -76,6 +84,7 @@ class TestEntryPoints(WorkspaceTestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('upload', result.stdout)
+        self.assertIn('publish', result.stdout)
         self.assertIn('check', result.stdout)
 
     def test_started_as_a_module(self):
@@ -83,6 +92,7 @@ class TestEntryPoints(WorkspaceTestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('upload', result.stdout)
+        self.assertIn('publish', result.stdout)
         self.assertIn('check', result.stdout)
 
 

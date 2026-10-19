@@ -15,30 +15,21 @@ MAX_SUPP_BYTES = 100 * 1024 * 1024
 
 def upload_row(client, metadata, pdf_path, row, save):
     """
-    Create the deposition, upload the .pdf and the supplementary files, publish it and read
-    its DOI, through `client` (a ZenodoClient).
+    Create the deposition and upload the .pdf and the supplementary files, through `client`
+    (a ZenodoClient). The deposition stays a draft: publishing is `publish_row`.
 
     Every completed step is recorded in `row` and saved with `save()`; a row that stopped
-    halfway continues from its last completed step. Returns True when the row is done.
+    halfway continues from its last completed step. Returns True when the row is `uploaded`.
     """
     stage = STAGES.index(row['status'])
 
     secho(f"Starting new upload for: {pdf_path} to {client.url}", fg='yellow')
-    access_depositions = client.list_depositions()
-    secho(f"Access depositions: {access_depositions.status_code}", fg='yellow')
-    if not succeeded(access_depositions):
-        return _fail(
-            row, save, "Cannot access Zenodo (check the token)", access_depositions,
-            "access check failed"
-        )
+    if not _check_access(client, row, save):
+        return False
 
     if stage < 1 and not _create(client, metadata, pdf_path, row, save):
         return False
     if stage < 2 and not _upload_files(client, pdf_path, row, save, resumed=(stage == 1)):
-        return False
-    if stage < 3 and not _publish(client, pdf_path, row, save):
-        return False
-    if not _confirm_doi(client, pdf_path, row, save):
         return False
 
     # If any supplementary files were skipped, they are listed in the skipped_files column.
@@ -47,6 +38,34 @@ def upload_row(client, metadata, pdf_path, row, save):
             f"Supplementary files skipped for {pdf_path}: {row['skipped_files']}. "
             f"Recorded in the skipped_files column.",
             fg='yellow'
+        )
+    return True
+
+
+def publish_row(client, pdf_path, row, save):
+    """
+    Publish the uploaded deposition of a row and read its DOI, through `client`.
+    A `published` row (DOI not read yet) only reads the DOI. Returns True when the row is done.
+    """
+    stage = STAGES.index(row['status'])
+
+    secho(f"Starting publication of: {pdf_path} on {client.url}", fg='yellow')
+    if not _check_access(client, row, save):
+        return False
+
+    if stage < 3 and not _publish(client, pdf_path, row, save):
+        return False
+    return _confirm_doi(client, pdf_path, row, save)
+
+
+def _check_access(client, row, save):
+    """Check that the token works; records the failure in the row otherwise."""
+    access_depositions = client.list_depositions()
+    secho(f"Access depositions: {access_depositions.status_code}", fg='yellow')
+    if not succeeded(access_depositions):
+        return _fail(
+            row, save, "Cannot access Zenodo (check the token)", access_depositions,
+            "access check failed"
         )
     return True
 

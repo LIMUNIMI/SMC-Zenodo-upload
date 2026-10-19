@@ -24,7 +24,7 @@ class TestValidEntries(WorkspaceTestCase):
     def test_installation_entry_is_uploaded_with_expected_metadata(self):
         path = self.copy_fixture('valid_installation.csv')
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertIsNone(result.exception, result.output)
         md = self.created_metadata()[0]
@@ -41,7 +41,7 @@ class TestValidEntries(WorkspaceTestCase):
     def test_paper_entry_is_uploaded_with_abstract_and_all_authors(self):
         path = self.copy_fixture('valid_paper.csv')
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertIsNone(result.exception, result.output)
         md = self.created_metadata()[0]
@@ -71,7 +71,7 @@ class TestExampleCsv(WorkspaceTestCase):
         self.assertEqual(self.fake.calls, [])
 
     def test_example_is_uploaded_with_the_documented_metadata(self):
-        result = self.run_upload(self.example)
+        result = self.run_full(self.example)
 
         self.assertEqual(result.exit_code, 0, result.output)
         full, partial, minimal = self.created_metadata()
@@ -97,7 +97,7 @@ class TestKnownProblematicEntries(WorkspaceTestCase):
         # The pdf column is derived from the url by bibcsv, so it stays empty.
         path = self.copy_fixture('missing_url.csv')
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 1)
         self.assertIn('empty pdf', result.output)
@@ -108,7 +108,7 @@ class TestKnownProblematicEntries(WorkspaceTestCase):
         self.make_pdf()
         path = self.write_csv(csv_row(editor='Andrew Johnston, Sam Ferguson, Jos Mulder'))
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertIsNone(result.exception, result.output)
         self.assertNotIn('Andrew Johnston', str(self.created_metadata()[0]))

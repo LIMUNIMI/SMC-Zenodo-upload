@@ -24,7 +24,7 @@ class TestSupplementaryMatching(SupplementaryTestCase):
         self.make_file('nime2025_10_file01.mp4')
         self.make_file('nime2025_10_file02.mov')
 
-        result = self.run_upload(self.bib)
+        result = self.run_full(self.bib)
 
         self.assertIsNone(result.exception, result.output)
         self.assertEqual(
@@ -38,27 +38,27 @@ class TestSupplementaryMatching(SupplementaryTestCase):
         self.make_file('nime2025_100_file01.mp4')  # different base name
         self.make_file('other_nime2025_10_x.mp4')  # prefix not at the start
 
-        self.run_upload(self.bib)
+        self.run_full(self.bib)
 
         self.assertEqual(self.uploaded_names(), ['nime2025_10.pdf'])
 
     def test_supplementary_files_are_uploaded_before_publishing(self):
         self.make_file('nime2025_10_file01.mp4')
 
-        self.run_upload(self.bib)
+        self.run_full(self.bib)
 
         self.assertEqual(
             self.call_summary(),
             [
                 ('GET', 'list'), ('POST', 'create'), ('POST', 'file'),
-                ('POST', 'file'), ('POST', 'publish'), ('GET', 'get'),
+                ('POST', 'file'), ('GET', 'list'), ('POST', 'publish'), ('GET', 'get'),
             ],
         )
 
     def test_skipped_files_column_is_empty_when_nothing_is_skipped(self):
         self.make_file('nime2025_10_file01.mp4')
 
-        self.run_upload(self.bib)
+        self.run_full(self.bib)
 
         self.assertEqual(self.done_rows(), [('nime2025_10.pdf', '1000', '10.5281/zenodo.1000')])
         self.assertEqual(self.read_state()[0]['skipped_files'], '')
@@ -70,7 +70,7 @@ class TestOversizedSupplementary(SupplementaryTestCase):
         self.make_file('nime2025_10_file02.mov')
         self.patch_sizes({'nime2025_10_file01.mp4': 100 * MB + 1})
 
-        result = self.run_upload(self.bib)
+        result = self.run_full(self.bib)
 
         self.assertIsNone(result.exception, result.output)
         self.assertIn('Skipping supplementary file nime2025_10_file01.mp4', result.output)
@@ -84,7 +84,7 @@ class TestOversizedSupplementary(SupplementaryTestCase):
         self.make_file('nime2025_10_file01.mp4')
         self.patch_sizes({'nime2025_10_file01.mp4': 100 * MB})
 
-        self.run_upload(self.bib)
+        self.run_full(self.bib)
 
         self.assertIn('nime2025_10_file01.mp4', self.uploaded_names())
         self.assertEqual(self.read_state()[0]['skipped_files'], '')
@@ -97,7 +97,7 @@ class TestOversizedSupplementary(SupplementaryTestCase):
             'nime2025_10_b.mp4': 300 * MB,
         })
 
-        self.run_upload(self.bib)
+        self.run_full(self.bib)
 
         row = self.read_state()[0]
         self.assertEqual(row['doi'], '10.5281/zenodo.1000')
@@ -111,7 +111,7 @@ class TestOversizedSupplementary(SupplementaryTestCase):
         self.make_file('nime2025_10_big.mp4')
         self.patch_sizes({'nime2025_10_big.mp4': 150 * MB})
 
-        self.run_upload(self.bib)
+        self.run_full(self.bib)
 
         sent = [c['filename'] for c in self.fake.calls if 'filename' in c]
         self.assertEqual(sent, ['nime2025_10.pdf'])
@@ -127,7 +127,7 @@ class TestSupplementaryServerErrors(SupplementaryTestCase):
             )
         }
 
-        result = self.run_upload(self.bib)
+        result = self.run_full(self.bib)
 
         self.assertIsNone(result.exception, result.output)
         self.assertIn('HTTP 413', result.output)
@@ -143,7 +143,7 @@ class TestSupplementaryServerErrors(SupplementaryTestCase):
         self.make_file('nime2025_10_file01.mp4')
         self.fake.fail_files = {'nime2025_10_file01.mp4': 500}
 
-        result = self.run_upload(self.bib)
+        result = self.run_full(self.bib)
 
         self.assertIn('Error happened during supplementary file upload', result.output)
         self.assertNotIn('HTTP 413', result.output)
@@ -153,7 +153,7 @@ class TestSupplementaryServerErrors(SupplementaryTestCase):
         self.make_file('nime2025_10_file01.mp4')
         self.fake.fail_files = {'nime2025_10_file01.mp4': 500}
 
-        result = self.run_upload(self.bib)
+        result = self.run_full(self.bib)
 
         self.assertIn('Supplementary files skipped for nime2025_10.pdf', result.output)
 

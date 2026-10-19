@@ -23,7 +23,7 @@ class StateTestCase(WorkspaceTestCase):
 
     def run_again(self, *args):
         self.fake.calls.clear()
-        return self.run_upload(self.last_csv, *args)
+        return self.run_full(self.last_csv, *args)
 
     @staticmethod
     def backups(path):
@@ -34,7 +34,7 @@ class TestStateColumns(StateTestCase):
     def test_finished_row_has_all_state_columns_filled(self):
         path = self.write_csv(csv_row(key='nime2025_1'))
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 0, result.output)
         row = self.row()
@@ -49,7 +49,7 @@ class TestStateColumns(StateTestCase):
     def test_production_run_records_production_server(self):
         path = self.write_csv(csv_row(key='nime2025_1'))
 
-        self.run_upload(path, '--production')
+        self.run_full(path, '--production')
 
         self.assertEqual(self.row()['server'], 'production')
 
@@ -59,7 +59,7 @@ class TestStateColumns(StateTestCase):
             csv_row(key='nime2025_2', track='Music', Year='2026'),
         )
 
-        self.run_upload(path)
+        self.run_full(path)
 
         with open(path, encoding='utf-8') as f:
             header = f.readline().strip().split(',')
@@ -74,7 +74,7 @@ class TestStateColumns(StateTestCase):
     def test_existing_state_columns_keep_their_position(self):
         path = self.write_csv(csv_row(key='nime2025_1', status='', doi='', track='Papers'))
 
-        self.run_upload(path)
+        self.run_full(path)
 
         with open(path, encoding='utf-8') as f:
             header = f.readline().strip().split(',')
@@ -84,7 +84,7 @@ class TestStateColumns(StateTestCase):
     def test_doi_from_the_bib_is_replaced(self):
         path = self.write_csv(csv_row(key='nime2025_1', doi='10.5281/zenodo.OLD'))
 
-        self.run_upload(path)
+        self.run_full(path)
 
         self.assertEqual(self.row()['doi'], '10.5281/zenodo.1000')
 
@@ -95,7 +95,7 @@ class TestStateColumns(StateTestCase):
                     doi='10.5281/zenodo.7'),
         )
 
-        self.run_upload(path)
+        self.run_full(path)
 
         first = self.row(0)
         self.assertEqual(first['abstract'], 'Line one\nLine two, with comma')
@@ -114,7 +114,7 @@ class TestStateColumns(StateTestCase):
     def test_no_temporary_file_is_left_behind(self):
         path = self.write_csv(csv_row(key='nime2025_1'))
 
-        self.run_upload(path)
+        self.run_full(path)
 
         self.assertEqual(
             sorted(f for f in os.listdir('upload') if f.endswith('.tmp')), []
@@ -135,16 +135,14 @@ class TestStateColumns(StateTestCase):
         path = self.write_csv(csv_row(key='nime2025_1'))
         with open(path, 'rb') as f:
             original = f.read()
-        self.fake.fail_publish = 500
         first_run = datetime.datetime(2026, 10, 16, 14, 32, 5)
         second_run = datetime.datetime(2026, 10, 16, 14, 32, 50)  # same minute
 
         with mock.patch('zenodo_upload.run.datetime.datetime') as clock:
             clock.now.return_value = first_run
             self.run_upload(path)
-            self.fake.fail_publish = None
             clock.now.return_value = second_run
-            self.run_again()
+            self.run_publish(path)
 
         first_backup = f'{path}.20261016_143205.bak'
         second_backup = f'{path}.20261016_143250.bak'
@@ -158,7 +156,7 @@ class TestStateColumns(StateTestCase):
         path = self.write_csv(csv_row(key='nime2025_1', title=''))
 
         self.run_check(path)
-        self.run_upload(path)
+        self.run_full(path)
 
         self.assertEqual(self.backups(path), [])
 
@@ -166,7 +164,7 @@ class TestStateColumns(StateTestCase):
 class TestResume(StateTestCase):
     def test_done_rows_are_skipped_without_any_call(self):
         path = self.write_csv(csv_row(key='nime2025_1'))
-        self.run_upload(path)
+        self.run_full(path)
 
         result = self.run_again()
 
@@ -182,9 +180,9 @@ class TestResume(StateTestCase):
             csv_row(key='nime2025_2'),
         )
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
-        self.assertIn('Skipping nime2025_1.pdf: already done', result.output)
+        self.assertIn('Skipping nime2025_1.pdf: already uploaded', result.output)
         self.assertEqual(self.fake.uploaded, [(1000, 'nime2025_2.pdf')])
         self.assertEqual(
             self.done_rows(),
@@ -200,7 +198,7 @@ class TestResume(StateTestCase):
             csv_row(key='nime2025_2'),
         )
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(len(self.done_rows()), 2)
@@ -208,7 +206,7 @@ class TestResume(StateTestCase):
     def test_pdf_failure_keeps_the_draft_and_the_next_run_reuses_it(self):
         path = self.write_csv(csv_row(key='nime2025_1'))
         self.fake.fail_files = {'nime2025_1.pdf': 500}
-        first = self.run_upload(path)
+        first = self.run_full(path)
 
         self.assertEqual(first.exit_code, 1)
         row = self.row()
@@ -230,7 +228,7 @@ class TestResume(StateTestCase):
         self.make_file('nime2025_1_file02.mp4')
         path = self.write_csv(csv_row(key='nime2025_1'))
         self.fake.fail_files = {'nime2025_1.pdf': 500}
-        self.run_upload(path)
+        self.run_full(path)
         # The deposition already has the first supplementary file.
         self.fake.uploaded.append((1000, 'nime2025_1_file01.mp4'))
         self.fake.fail_files = {}
@@ -247,7 +245,7 @@ class TestResume(StateTestCase):
     def test_publish_failure_is_retried_without_touching_the_files(self):
         path = self.write_csv(csv_row(key='nime2025_1'))
         self.fake.fail_publish = 500
-        self.run_upload(path)
+        self.run_full(path)
         self.assertEqual(self.row()['status'], 'uploaded')
         self.assertEqual(self.row()['error'], 'publish failed: HTTP 500')
 
@@ -262,7 +260,7 @@ class TestResume(StateTestCase):
         path = self.write_csv(csv_row(key='nime2025_1'))
         self.fake.lost_publish = True
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertIn('published anyway', result.output)
@@ -274,7 +272,7 @@ class TestResume(StateTestCase):
             csv_row(key='nime2025_1', status='published', server='sandbox', deposition_id='555')
         )
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(self.post_summary(), [])
@@ -285,7 +283,7 @@ class TestResume(StateTestCase):
         path = self.write_csv(csv_row(key='nime2025_1'))
         self.fake.doi_missing = True
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 1)
         row = self.row()
@@ -304,7 +302,7 @@ class TestResume(StateTestCase):
         )
         self.fake.uploaded.append((555, 'nime2025_1.pdf'))
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual([c for c in self.fake.calls if 'filename' in c], [])
@@ -317,7 +315,7 @@ class TestResume(StateTestCase):
         )
         self.fake.fail_listing = 500
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 1)
         row = self.row()
@@ -328,7 +326,7 @@ class TestResume(StateTestCase):
         path = self.write_csv(csv_row(key='nime2025_1'))
         self.fake.fail_get = 500
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 1)
         row = self.row()
@@ -340,7 +338,7 @@ class TestResume(StateTestCase):
         self.fake.fail_publish = 500
         self.fake.fail_get = 500
 
-        self.run_upload(path)
+        self.run_full(path)
 
         row = self.row()
         self.assertEqual((row['status'], row['error']), ('uploaded', 'publish failed: HTTP 500'))
@@ -350,7 +348,7 @@ class TestResume(StateTestCase):
         self.fake.fail_publish = 500
         self.fake.fail_get = FakeResponse(200, text='<html>maintenance</html>')
 
-        self.run_upload(path)
+        self.run_full(path)
 
         row = self.row()
         self.assertEqual((row['status'], row['error']), ('uploaded', 'publish failed: HTTP 500'))
@@ -359,7 +357,7 @@ class TestResume(StateTestCase):
         path = self.write_csv(csv_row(key='nime2025_1'), csv_row(key='nime2025_2', title='Other'))
         self.fake.fail_titles = {'A Title'}
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 1)
         self.assertEqual([r['status'] for r in self.read_state()], ['pending', 'done'])
@@ -369,7 +367,7 @@ class TestResume(StateTestCase):
     def test_error_is_cleared_when_the_row_advances(self):
         path = self.write_csv(csv_row(key='nime2025_1'))
         self.fake.fail_create = 500
-        self.run_upload(path)
+        self.run_full(path)
         self.assertNotEqual(self.row()['error'], '')
 
         self.fake.fail_create = None
@@ -380,17 +378,17 @@ class TestResume(StateTestCase):
     def test_exit_code_is_zero_when_everything_is_done(self):
         path = self.write_csv(csv_row(key='nime2025_1'), csv_row(key='nime2025_2'))
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 0)
-        self.assertIn('Summary: 2 uploaded, 0 already done, 0 not completed.', result.output)
+        self.assertIn('Summary: 2 uploaded, 0 already uploaded, 0 not completed.', result.output)
 
     def test_skipped_supplementary_files_survive_a_resume(self):
         self.make_file('nime2025_1_big.mp4')
         path = self.write_csv(csv_row(key='nime2025_1'))
         with mock.patch('os.path.getsize', side_effect=fake_sizes({'nime2025_1_big.mp4': 150 * MB})):
             self.fake.fail_publish = 500
-            self.run_upload(path)
+            self.run_full(path)
             self.assertEqual(self.row()['skipped_files'], 'nime2025_1_big.mp4')
             self.fake.fail_publish = None
             self.run_again()
@@ -399,10 +397,118 @@ class TestResume(StateTestCase):
         self.assertEqual((row['status'], row['skipped_files']), ('done', 'nime2025_1_big.mp4'))
 
 
+class TestPublishCommand(StateTestCase):
+    def uploaded_file(self):
+        return self.write_csv(
+            csv_row(key='nime2025_1', status='uploaded', server='sandbox', deposition_id='555'),
+            csv_row(key='nime2025_2', status='created', server='sandbox', deposition_id='556'),
+        )
+
+    def test_only_uploaded_rows_are_published_and_the_others_are_reported(self):
+        path = self.uploaded_file()
+
+        result = self.run_publish(path)
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertEqual(
+            [r['status'] for r in self.read_state()], ['done', 'created']
+        )
+        self.assertEqual(self.row(0)['doi'], '10.5281/zenodo.555')
+        self.assertIn('Cannot publish nime2025_2.pdf', result.output)
+        self.assertIn('1 not completed', result.output)
+        self.assertEqual(len(self.fake.calls_to('/actions/publish')), 1)
+        self.assertEqual(self.fake.uploaded, [])  # nothing is uploaded by publish
+
+    def test_pending_rows_are_not_published_and_make_no_call(self):
+        path = self.write_csv(csv_row(key='nime2025_1', status='pending'))
+
+        result = self.run_publish(path)
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertEqual(self.fake.calls, [])
+        self.assertEqual(self.backups(path), [])
+        self.assertEqual(self.row()['status'], 'pending')
+
+    def test_rows_of_the_other_server_are_left_alone(self):
+        path = self.write_csv(
+            csv_row(key='nime2025_1', status='uploaded', server='production', deposition_id='9'),
+        )
+        with open(path, 'rb') as f:
+            before = f.read()
+
+        result = self.run_publish(path)
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertEqual(self.fake.calls, [])
+        with open(path, 'rb') as f:
+            self.assertEqual(f.read(), before)
+
+    def test_production_publish_uses_the_production_server(self):
+        path = self.write_csv(
+            csv_row(key='nime2025_1', status='uploaded', server='production', deposition_id='9'),
+        )
+
+        result = self.run_publish(path, '--production')
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertIn('PUBLISHING to the production', result.output)
+        self.assertEqual(self.row()['server'], 'production')
+        self.assertEqual(self.row()['status'], 'done')
+
+    def test_done_rows_are_skipped_without_any_call(self):
+        path = self.write_csv(
+            csv_row(key='nime2025_1', status='done', server='sandbox', deposition_id='7',
+                    doi='10.5281/zenodo.7'),
+        )
+
+        result = self.run_publish(path)
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn('Nothing to publish', result.output)
+        self.assertEqual(self.fake.calls, [])
+        self.assertEqual(self.backups(path), [])
+
+    def test_publish_does_not_need_the_pdfs(self):
+        os.remove('upload/nime2025_1.pdf')
+        path = self.write_csv(
+            csv_row(key='nime2025_1', status='uploaded', server='sandbox', deposition_id='555'),
+        )
+
+        result = self.run_publish(path)
+
+        self.assertEqual(result.exit_code, 0, result.output)
+
+    def test_refused_token_leaves_the_row_uploaded(self):
+        path = self.write_csv(
+            csv_row(key='nime2025_1', status='uploaded', server='sandbox', deposition_id='555'),
+        )
+        self.fake.fail_list = 401
+
+        result = self.run_publish(path)
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertEqual(self.row()['status'], 'uploaded')
+        self.assertEqual(self.row()['error'], 'access check failed: HTTP 401')
+        self.assertEqual(self.fake.calls_to('/actions/publish'), [])
+
+    def test_a_publish_failure_does_not_stop_the_other_rows(self):
+        path = self.write_csv(
+            csv_row(key='nime2025_1', status='uploaded', server='sandbox', deposition_id='555'),
+            csv_row(key='nime2025_2', status='uploaded', server='sandbox', deposition_id='556'),
+        )
+        self.fake.fail_publish = 500
+
+        result = self.run_publish(path)
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertEqual(len(self.fake.calls_to('/actions/publish')), 2)
+        self.assertIn('2 not completed', result.output)
+
+
 class TestServerHandling(StateTestCase):
     def test_sandbox_rows_restart_on_production(self):
         path = self.write_csv(csv_row(key='nime2025_1'))
-        self.run_upload(path)
+        self.run_full(path)
         self.assertEqual(self.row()['server'], 'sandbox')
 
         result = self.run_again('--production')
@@ -419,7 +525,7 @@ class TestServerHandling(StateTestCase):
             csv_row(key='nime2025_1', status='created', server='sandbox', deposition_id='555')
         )
 
-        self.run_upload(path, '--production')
+        self.run_full(path, '--production')
 
         self.assertEqual(self.fake.uploaded, [(1000, 'nime2025_1.pdf')])
         self.assertEqual(self.row()['deposition_id'], '1000')
@@ -433,7 +539,7 @@ class TestServerHandling(StateTestCase):
         with open(path, 'rb') as f:
             before = f.read()
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 1)
         self.assertIn('nime2025_1', result.output)
@@ -447,7 +553,7 @@ class TestServerHandling(StateTestCase):
             csv_row(key='nime2025_1', status='published', server='production', deposition_id='9'),
         )
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 1)
         self.assertEqual(self.fake.calls, [])
@@ -457,7 +563,7 @@ class TestServerHandling(StateTestCase):
             csv_row(key='nime2025_1', status='published', server='production', deposition_id='9'),
         )
 
-        result = self.run_upload(path, '--production')
+        result = self.run_full(path, '--production')
 
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(self.row()['doi'], '10.5281/zenodo.9')
@@ -468,7 +574,7 @@ class TestStateValidation(StateTestCase):
     def test_unknown_status_is_rejected(self):
         path = self.write_csv(csv_row(key='nime2025_1', status='finished'))
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 1)
         self.assertIn("unknown status 'finished'", result.output)
@@ -477,7 +583,7 @@ class TestStateValidation(StateTestCase):
     def test_unknown_server_is_rejected(self):
         path = self.write_csv(csv_row(key='nime2025_1', status='created', server='staging'))
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 1)
         self.assertIn("unknown server 'staging'", result.output)
@@ -492,7 +598,7 @@ class TestStateValidation(StateTestCase):
             with self.subTest(name):
                 path = self.write_csv(csv_row(key='nime2025_1', **state))
 
-                result = self.run_upload(path)
+                result = self.run_full(path)
 
                 self.assertEqual(result.exit_code, 1)
                 self.assertIn('needs server and deposition_id', result.output)
@@ -501,7 +607,7 @@ class TestStateValidation(StateTestCase):
     def test_pending_row_needs_no_server_or_deposition_id(self):
         path = self.write_csv(csv_row(key='nime2025_1', status='pending'))
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 0, result.output)
 
@@ -511,7 +617,7 @@ class TestStateValidation(StateTestCase):
         with open(path, 'rb') as f:
             before = f.read()
 
-        result = self.run_upload(path)
+        result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 1)
         self.assertEqual(self.fake.calls, [])
@@ -525,7 +631,7 @@ class TestSavingFailures(StateTestCase):
         path = self.write_csv(csv_row(key='nime2025_1'), csv_row(key='nime2025_2'))
 
         with mock.patch('os.replace', side_effect=PermissionError('file is locked')):
-            result = self.run_upload(path)
+            result = self.run_full(path)
 
         self.assertEqual(result.exit_code, 1)
         self.assertIsNone(result.exception, result.output)
@@ -538,7 +644,7 @@ class TestSavingFailures(StateTestCase):
     def test_run_after_an_unwritable_file_resumes_from_the_saved_state(self):
         path = self.write_csv(csv_row(key='nime2025_1'))
         with mock.patch('os.replace', side_effect=PermissionError('locked')):
-            self.run_upload(path)
+            self.run_full(path)
 
         result = self.run_again()
 

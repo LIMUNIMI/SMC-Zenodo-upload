@@ -19,7 +19,8 @@ added to the conference's Zenodo community
 (e.g. [SMC](https://zenodo.org/communities/smc/)).
 
 The metadata from the CSV rows are tied to the article (.pdf file) and
-are published to Zenodo resulting in the creation of a DOI.
+uploaded to Zenodo as a draft (`upload`); the drafts are then published
+(`publish`), which creates the DOIs.
 
 > [!NOTE]
 > The result of every paper (status, Zenodo deposition id, DOI, errors) is
@@ -48,8 +49,9 @@ For the proceedings chair of the conference, your workflow should be:
 4. follow the "Install" and "Run" instructions below and test multiple
    times with the Zenodo sandbox to make sure that your metadata is
    correct and working.
-5. upload to production Zenodo. The CSV file itself will show the DOI of
-   each paper (`doi` column, `status` `done`).
+5. upload to production Zenodo, check the drafts, then publish them. The
+   CSV file itself will show the DOI of each paper (`doi` column,
+   `status` `done`).
 
 Then you can pass the CSV file to whoever maintains the conference
 bibliography and website, who will:
@@ -148,18 +150,30 @@ When your metadata is ready you can try uploading to the sandbox server:
 python zenodo_upload upload upload/proceedings.csv
 ```
 
-By default, the program uploads to the Zenodo sandbox. When you are
+`upload` creates a draft for every paper and uploads its files, but does
+**not** publish it: the drafts can still be checked on Zenodo (and
+supplementary files that were skipped can be added, see below). To
+publish them and get the DOIs:
+
+```bash
+python zenodo_upload publish upload/proceedings.csv
+```
+
+By default, the program works on the Zenodo sandbox. When you are
 **absolutely ready to commit to the production server** you can run:
 
 ```bash
 python zenodo_upload upload upload/proceedings.csv --production
+python zenodo_upload publish upload/proceedings.csv --production
 ```
 
-to do your final uploads.
+to do your final uploads. Publishing is irreversible.
 
-Rows that are already `done` on the chosen server are skipped, so the
-same command can be run again after an error. Run the sandbox and the
-production upload on the same file: the `server` column records which
+Rows that were already taken as far as the command goes on the chosen
+server (`uploaded` for `upload`, `done` for `publish`) are skipped, so
+the same command can be run again after an error. `publish` handles only
+rows uploaded to the same server; the others are reported as not
+completed. Run the sandbox and the production upload on the same file: the `server` column records which
 server each row refers to, and rows recorded for the sandbox restart
 from scratch on production.
 
@@ -184,11 +198,12 @@ runs):
 | `updated_at` | time of the last change |
 
 On a new run each row continues from its last step: a `created` row
-reuses its Zenodo draft and only uploads the missing files, an
-`uploaded` row is published, a `published` row only reads its DOI. A
+reuses its Zenodo draft and only uploads the missing files (`upload`
+ends with `uploaded`); with `publish`, an `uploaded` row is published and
+a `published` row only reads its DOI (`publish` ends with `done`). A
 publish whose answer got lost is recognised and not repeated. At the end
 the program prints a summary and exits with an error code if some rows
-are not done.
+are not completed.
 
 Two safeguards:
 
@@ -300,11 +315,12 @@ When any supplementary files are skipped for a given paper (either
 because they are larger than 100 MB or because the server rejected
 them), their names are listed in the `skipped_files` column of its row,
 separated by `;`, e.g. `paper_14_file01.mp4;paper_14_file02.mov`. The
-paper itself is published and has its DOI.
+paper itself is uploaded as a draft.
 
 To finish: filter the rows with a non-empty `skipped_files`, and upload
-those files manually to the deposition `deposition_id` via the Zenodo
-web UI (on the server given by `server`).
+those files manually to the draft `deposition_id` via the Zenodo web UI
+(on the server given by `server`) **before running `publish`**: files
+cannot be added to a published record.
 
 ## The CSV file
 
@@ -378,11 +394,16 @@ Tests: `python -m unittest discover -s bibcsv/tests`.
 ## Differences from the NIME script
 
 - Conference-agnostic: everything that depends on the edition lives in
-  `conference.toml`, nothing NIME-specific is left in the code.
+  `conference.toml` (including licence, publisher, place, proceedings
+  title and ISBN/ISSN, which are not repeated in every CSV row), nothing
+  NIME-specific is left in the code, and placeholder values are rejected
+  before anything is done.
 - The input is a CSV file with one row per paper instead of the `.bib`
   file; `bibcsv/bibcsv.py` converts between the two.
 - Progress is written back to the CSV (status, server, deposition id,
   DOI, errors), so interrupted runs resume and `nime_dois.txt` is gone.
+- Uploading and publishing are two commands: `upload` leaves drafts that
+  can be checked, `publish` makes them public and gets the DOIs.
 - Fewer dependencies (no `click`, no `poetry`), code split into small
   modules, checks on the CSV and the PDFs before any upload, and a test
   suite that never contacts Zenodo.

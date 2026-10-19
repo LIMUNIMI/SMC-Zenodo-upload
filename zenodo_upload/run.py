@@ -7,8 +7,8 @@ import shutil
 
 from zenodo_upload.console import secho
 from zenodo_upload.metadata import build_deposition
-from zenodo_upload.rows import CsvError, read_rows, save_rows, split_authors
-from zenodo_upload.uploader import UPLOAD_FOLDER, upload_row
+from zenodo_upload.rows import CsvError, STAGES, read_rows, save_rows, split_authors
+from zenodo_upload.uploader import UPLOAD_FOLDER, publish_row, upload_row
 from zenodo_upload.zenodo import ZenodoClient
 
 # Maximum size for PDF upload (100 MB) – PDFs over this limit will abort the whole run.
@@ -20,13 +20,14 @@ def process_csv(
     conference,
     secrets,
     verbose=False,
-    upload_pdf=False,
+    action='check',
     print_authors=False,
     production_zenodo=False
 ):
     """
-    Build the metadata of every row of the CSV file and, when `upload_pdf`, upload it
-    to Zenodo (`conference`: metadata.Conference; `secrets`: the tokens).
+    Build the metadata of every row of the CSV file and, according to `action`, only show
+    it ('check'), upload the drafts to Zenodo ('upload') or publish the uploaded drafts
+    ('publish'); `conference`: metadata.Conference; `secrets`: the tokens.
     Returns the number of rows that could not be completed.
     """
     fieldnames, rows = read_rows(csvfilename)
@@ -35,7 +36,9 @@ def process_csv(
     def save():
         save_rows(csvfilename, fieldnames, rows)
 
-    if upload_pdf and not _prepare_upload(csvfilename, rows, target):
+    if action == 'upload' and not _prepare_upload(csvfilename, rows, target):
+        return 0
+    if action == 'publish' and not _prepare_publish(csvfilename, rows, target):
         return 0
 
     client = None
@@ -45,9 +48,24 @@ def process_csv(
     for row in rows:
         pdf_name = row['pdf']
 
-        if upload_pdf and is_done(row, target):
-            secho(f"Skipping {pdf_name}: already done ({row['doi']}).", fg='green')
+        if action != 'check' and is_finished(row, target, action):
+            secho(f"Skipping {pdf_name}: already {_PAST[action]} ({row['status']}).", fg='green')
             already_done += 1
+            continue
+
+        if action == 'publish':
+            if not _is_ready_to_publish(row, target):
+                secho(
+                    f"Cannot publish {pdf_name}: it must be uploaded to {target} first "
+                    f"(status '{row['status']}', server '{row['server']}').", fg='red'
+                )
+                failed += 1
+            else:
+                client = client or ZenodoClient.for_target(target, secrets)
+                if publish_row(client, pdf_name, row, save):
+                    done_now += 1
+                else:
+                    failed += 1
             continue
 
         if not os.path.exists(UPLOAD_FOLDER + pdf_name):
@@ -61,24 +79,41 @@ def process_csv(
         if verbose:
             pprint.pp(data['metadata'])
 
-        if upload_pdf:
+        if action == 'upload':
             client = client or ZenodoClient.for_target(target, secrets)
             if upload_row(client, data, pdf_name, row, save):
                 done_now += 1
             else:
                 failed += 1
 
-    if upload_pdf:
+    if action != 'check':
         secho(
-            f"Summary: {done_now} uploaded, {already_done} already done, {failed} not completed"
+            f"Summary: {done_now} {_PAST[action]}, {already_done} already {_PAST[action]}, "
+            f"{failed} not completed"
             + (" (see the error column, then run again to resume)." if failed else "."),
             fg='red' if failed else 'green'
         )
+        if action == 'upload' and done_now and not failed:
+            secho("The records are drafts: run `publish` to publish them.", fg='yellow')
     return failed
 
 
-def is_done(row, target):
-    return row['status'] == 'done' and row['server'] == target
+_PAST = {'upload': 'uploaded', 'publish': 'published'}
+
+# The last step each action completes
+_LAST_STAGE = {'upload': 'uploaded', 'publish': 'done'}
+
+
+def is_finished(row, target, action):
+    """True if the row has already been taken, on `target`, as far as `action` goes."""
+    return (
+        row['server'] == target
+        and STAGES.index(row['status']) >= STAGES.index(_LAST_STAGE[action])
+    )
+
+
+def _is_ready_to_publish(row, target):
+    return row['server'] == target and STAGES.index(row['status']) >= STAGES.index('uploaded')
 
 
 def _prepare_upload(csvfilename, rows, target):
@@ -90,19 +125,34 @@ def _prepare_upload(csvfilename, rows, target):
     """
     _refuse_to_overwrite_production(rows, target)
 
-    todo = [row for row in rows if not is_done(row, target)]
+    todo = [row for row in rows if not is_finished(row, target, 'upload')]
     if not _pdfs_are_usable(todo):
         raise CsvError("Upload aborted: fix the PDFs listed above.")  # before any upload
 
     if not todo:
-        secho(f"Nothing to upload: all {len(rows)} rows are done on {target}.", fg='green')
+        secho(f"Nothing to upload: all {len(rows)} rows are uploaded on {target}.", fg='green')
         return False
 
     _restart_rows_of_other_server(todo, target)
 
-    # Keep a copy of the file as it was before this run.
-    shutil.copy2(csvfilename, f"{csvfilename}.{datetime.datetime.now():%Y%m%d_%H%M%S}.bak")
+    _backup(csvfilename)
     return True
+
+
+def _prepare_publish(csvfilename, rows, target):
+    """Returns False when nothing is left to publish; otherwise backs the file up."""
+    todo = [row for row in rows if not is_finished(row, target, 'publish')]
+    if not todo:
+        secho(f"Nothing to publish: all {len(rows)} rows are done on {target}.", fg='green')
+        return False
+    if any(_is_ready_to_publish(row, target) for row in todo):
+        _backup(csvfilename)
+    return True
+
+
+def _backup(csvfilename):
+    """Keep a copy of the file as it was before this run."""
+    shutil.copy2(csvfilename, f"{csvfilename}.{datetime.datetime.now():%Y%m%d_%H%M%S}.bak")
 
 
 def _refuse_to_overwrite_production(rows, target):

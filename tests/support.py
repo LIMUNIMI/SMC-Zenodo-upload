@@ -345,6 +345,20 @@ class WorkspaceTestCase(unittest.TestCase):
         with mock.patch('builtins.input', return_value=''):
             return self.run_cli('upload', csv_path, *args)
 
+    def run_publish(self, csv_path, *args):
+        with mock.patch('builtins.input', return_value=''):
+            return self.run_cli('publish', csv_path, *args)
+
+    def run_full(self, csv_path, *args):
+        """``upload`` followed by ``publish``: the output is joined, the worst exit code kept."""
+        uploaded = self.run_upload(csv_path, *args)
+        published = self.run_publish(csv_path, *args)
+        return CliResult(
+            uploaded.exit_code or published.exit_code,
+            uploaded.output + published.output,
+            uploaded.exception or published.exception,
+        )
+
     def run_check(self, csv_path, *args):
         return self.run_cli('check', csv_path, *args)
 

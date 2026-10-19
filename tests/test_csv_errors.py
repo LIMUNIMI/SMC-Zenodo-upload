@@ -169,7 +169,7 @@ class TestOversizedPdf(WorkspaceTestCase):
         result = self.run_upload(self.csv)
 
         self.assertIsNone(result.exception, result.output)
-        self.assertEqual(len(self.done_rows()), 2)
+        self.assertEqual([r['status'] for r in self.read_state()], ['uploaded', 'uploaded'])
 
     def test_check_does_not_enforce_pdf_size(self):
         self.patch_sizes({'nime2025_1.pdf': 500 * MB})
