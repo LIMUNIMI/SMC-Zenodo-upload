@@ -227,6 +227,7 @@ class WorkspaceTestCase(unittest.TestCase):
 
     write_secrets = True
     write_conference = True
+    fake_zenodo = True  # False: no fake, requests go to the real server (see tests/live.py)
 
     def setUp(self):
         self._old_cwd = os.getcwd()
@@ -242,14 +243,15 @@ class WorkspaceTestCase(unittest.TestCase):
                 f.write(CONFERENCE_TOML)
 
         self.fake = FakeZenodo()
-        patcher = mock.patch('requests.Session', side_effect=lambda: FakeSession(self.fake))
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
         self.sleeps = []  # the waits between retries, which do not really happen
-        patcher = mock.patch('zenodo_upload.zenodo.time.sleep', side_effect=self.sleeps.append)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        if self.fake_zenodo:
+            patcher = mock.patch('requests.Session', side_effect=lambda: FakeSession(self.fake))
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+            patcher = mock.patch('zenodo_upload.zenodo.time.sleep', side_effect=self.sleeps.append)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
         if self.write_secrets and self.write_conference:
             self.app = importlib.import_module(MODULE_NAME)

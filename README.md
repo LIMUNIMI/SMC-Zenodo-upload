@@ -94,7 +94,7 @@ accounts, so you need one token for each:
    `SANDBOX_TOKEN` of `secrets.toml` (see [Run](#run)). Never commit
    this file or share the tokens.
 
-If a run stops at the start with `Cannot access ... HTTP 401`, the token
+If a run stops at the start with `Cannot access ... HTTP 401` (or `403`), the token
 for that server is wrong, still the placeholder of
 `secrets.toml.example`, revoked, or missing one of the two scopes; the
 CSV file is left untouched.
@@ -223,11 +223,39 @@ Two safeguards:
 
 ## Tests
 
-Tests use the standard `unittest` module and never contact Zenodo:
+Tests use the standard `unittest` module and, apart from the live tests
+below, never contact Zenodo:
 
 ```bash
 python -m unittest discover -s tests -t .
 ```
+
+### Live tests (Zenodo sandbox)
+
+`tests/test_live_sandbox.py` checks the program against the real Zenodo
+**sandbox**. These tests run as part of the command above, but only if
+`secrets.toml` holds a real `SANDBOX_TOKEN` (not the placeholder);
+otherwise they are skipped. They never read the production token. To run
+only them:
+
+```bash
+python -m unittest tests.test_live_sandbox -v
+```
+
+They use the community set in `conference.toml`, which must exist on the
+sandbox. They create drafts titled `[TEST zenodo_upload] ...` and delete
+them at the end of every test.
+
+One more test goes through `upload` and `publish` up to the DOI. It
+leaves a **permanent record** on the sandbox (published records cannot be
+deleted), so it is skipped unless you ask for it:
+
+```bash
+ZENODO_LIVE_PUBLISH=1 python -m unittest tests.test_live_sandbox.TestLivePublish -v
+```
+
+(on PowerShell: `$env:ZENODO_LIVE_PUBLISH='1'` first). The offline tests
+cover the same path with a fake Zenodo.
 
 ## Conference Metadata
 
@@ -266,7 +294,8 @@ identifier and must match the licence printed on the paper template;
 record's publisher. `CONFERENCE_PLACE`, `PROCEEDINGS_TITLE`, `ISBN` and
 `ISSN` are the same for all papers, so they are not read from the CSV
 file. All records are required except `ISSN`, which can be left empty (no
-ISSN is sent then).
+ISSN is sent then). Note that Zenodo's deposit API has no ISSN field: the
+value is accepted but not stored in the record (checked on the sandbox).
 
 ## Additional files
 
