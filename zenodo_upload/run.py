@@ -36,12 +36,19 @@ def process_csv(
     def save():
         save_rows(csvfilename, fieldnames, rows)
 
-    if action == 'upload' and not _prepare_upload(csvfilename, rows, target):
+    if action == 'upload' and not _prepare_upload(rows, target):
         return 0
-    if action == 'publish' and not _prepare_publish(csvfilename, rows, target):
+    if action == 'publish' and not _prepare_publish(rows, target):
         return 0
 
+    # Token check once, before the file is touched: a refused token changes nothing.
     client = None
+    if _has_work(rows, target, action):
+        client = ZenodoClient.for_target(target, secrets)
+        client.check_access()
+        secho(f"Access to {client.url} checked.", fg='green')
+        _backup(csvfilename)
+
     done_now = already_done = failed = 0
 
     # loop through the individual rows
@@ -61,7 +68,6 @@ def process_csv(
                 )
                 failed += 1
             else:
-                client = client or ZenodoClient.for_target(target, secrets)
                 if publish_row(client, pdf_name, row, save):
                     done_now += 1
                 else:
@@ -80,7 +86,6 @@ def process_csv(
             pprint.pp(data['metadata'])
 
         if action == 'upload':
-            client = client or ZenodoClient.for_target(target, secrets)
             if upload_row(client, data, pdf_name, row, save):
                 done_now += 1
             else:
@@ -112,11 +117,21 @@ def is_finished(row, target, action):
     )
 
 
+def _has_work(rows, target, action):
+    """True if some row will make a request to Zenodo."""
+    if action == 'upload':
+        return True  # _prepare_upload has already stopped the run when nothing is left
+    return action == 'publish' and any(
+        not is_finished(row, target, action) and _is_ready_to_publish(row, target)
+        for row in rows
+    )
+
+
 def _is_ready_to_publish(row, target):
     return row['server'] == target and STAGES.index(row['status']) >= STAGES.index('uploaded')
 
 
-def _prepare_upload(csvfilename, rows, target):
+def _prepare_upload(rows, target):
     """
     Checks and preparations before the first upload. Returns False when the run must stop
     without uploading anything (nothing is left to do).
@@ -134,19 +149,15 @@ def _prepare_upload(csvfilename, rows, target):
         return False
 
     _restart_rows_of_other_server(todo, target)
-
-    _backup(csvfilename)
     return True
 
 
-def _prepare_publish(csvfilename, rows, target):
-    """Returns False when nothing is left to publish; otherwise backs the file up."""
+def _prepare_publish(rows, target):
+    """Returns False when nothing is left to publish."""
     todo = [row for row in rows if not is_finished(row, target, 'publish')]
     if not todo:
         secho(f"Nothing to publish: all {len(rows)} rows are done on {target}.", fg='green')
         return False
-    if any(_is_ready_to_publish(row, target) for row in todo):
-        _backup(csvfilename)
     return True
 
 

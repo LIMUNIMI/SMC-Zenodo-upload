@@ -24,8 +24,6 @@ def upload_row(client, metadata, pdf_path, row, save):
     stage = STAGES.index(row['status'])
 
     secho(f"Starting new upload for: {pdf_path} to {client.url}", fg='yellow')
-    if not _check_access(client, row, save):
-        return False
 
     if stage < 1 and not _create(client, metadata, pdf_path, row, save):
         return False
@@ -50,24 +48,10 @@ def publish_row(client, pdf_path, row, save):
     stage = STAGES.index(row['status'])
 
     secho(f"Starting publication of: {pdf_path} on {client.url}", fg='yellow')
-    if not _check_access(client, row, save):
-        return False
 
     if stage < 3 and not _publish(client, pdf_path, row, save):
         return False
     return _confirm_doi(client, pdf_path, row, save)
-
-
-def _check_access(client, row, save):
-    """Check that the token works; records the failure in the row otherwise."""
-    access_depositions = client.list_depositions()
-    secho(f"Access depositions: {access_depositions.status_code}", fg='yellow')
-    if not succeeded(access_depositions):
-        return _fail(
-            row, save, "Cannot access Zenodo (check the token)", access_depositions,
-            "access check failed"
-        )
-    return True
 
 
 def _fail(row, save, message, response, error, show_response=True):

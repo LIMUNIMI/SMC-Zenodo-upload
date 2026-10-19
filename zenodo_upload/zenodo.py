@@ -11,6 +11,10 @@ SERVERS = {
 }
 
 
+class AccessError(Exception):
+    """Zenodo refuses the token; the message says why."""
+
+
 def succeeded(response):
     return response.status_code <= 210
 
@@ -32,8 +36,14 @@ class ZenodoClient:
     def _depositions(self):
         return f"{self.url}/api/deposit/depositions"
 
-    def list_depositions(self):
-        return self.session.get(self._depositions)
+    def check_access(self):
+        """Raise AccessError unless Zenodo accepts the token (lists the account's depositions)."""
+        response = self.session.get(self._depositions)
+        if not succeeded(response):
+            raise AccessError(
+                f"Cannot access {self.url}, HTTP {response.status_code}: check the token "
+                f"for the {self.target} server in secrets.toml."
+            )
 
     def create(self, metadata):
         return self.session.post(

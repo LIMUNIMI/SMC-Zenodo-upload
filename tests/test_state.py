@@ -487,9 +487,11 @@ class TestPublishCommand(StateTestCase):
         result = self.run_publish(path)
 
         self.assertEqual(result.exit_code, 1)
+        self.assertIn('HTTP 401', result.output)
         self.assertEqual(self.row()['status'], 'uploaded')
-        self.assertEqual(self.row()['error'], 'access check failed: HTTP 401')
+        self.assertNotIn('error', self.row())  # the file was not rewritten
         self.assertEqual(self.fake.calls_to('/actions/publish'), [])
+        self.assertEqual(self.backups(path), [])
 
     def test_a_publish_failure_does_not_stop_the_other_rows(self):
         path = self.write_csv(

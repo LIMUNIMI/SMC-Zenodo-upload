@@ -94,9 +94,10 @@ accounts, so you need one token for each:
    `SANDBOX_TOKEN` of `secrets.toml` (see [Run](#run)). Never commit
    this file or share the tokens.
 
-If an upload stops with `access check failed: HTTP 401` in the `error`
-column, the token for that server is wrong, still the placeholder of
-`secrets.toml.example`, revoked, or missing one of the two scopes.
+If a run stops at the start with `Cannot access ... HTTP 401`, the token
+for that server is wrong, still the placeholder of
+`secrets.toml.example`, revoked, or missing one of the two scopes; the
+CSV file is left untouched.
 
 The records are added to the community set in `ZENODO_COMMUNITY`
 ([Conference Metadata](#conference-metadata)). Communities are separate

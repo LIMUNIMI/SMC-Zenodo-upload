@@ -51,6 +51,7 @@ from zenodo_upload.metadata import Conference
 from zenodo_upload.rows import CsvError, STAGES, STATE_COLUMNS, read_rows
 from zenodo_upload.run import MAX_PDF_BYTES, process_csv
 from zenodo_upload.uploader import MAX_SUPP_BYTES, UPLOAD_FOLDER
+from zenodo_upload.zenodo import AccessError
 
 # Per-edition conference metadata, edit conference.toml for each edition:
 with open("conference.toml", "rb") as f:
@@ -164,7 +165,7 @@ def main(argv=None):
             failed = publish(args.csvfile, args.production)
         else:
             failed = check(args.csvfile, args.authors)
-    except (ConfigError, CsvError) as error:
+    except (AccessError, ConfigError, CsvError) as error:
         secho(str(error), fg='red')
         sys.exit(1)
     if failed:

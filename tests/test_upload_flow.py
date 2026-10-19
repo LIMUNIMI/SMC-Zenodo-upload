@@ -1,3 +1,4 @@
+import glob
 import unittest
 
 from tests.support import (
@@ -152,11 +153,13 @@ class TestUploadFailures(WorkspaceTestCase):
 
         self.assertEqual(result.exit_code, 1)
         self.assertIsNone(result.exception, result.output)
-        self.assertIn('Cannot access Zenodo', result.output)
+        self.assertIn('Cannot access', result.output)
+        self.assertIn('HTTP 401', result.output)
         self.assertEqual(self.created_depositions(), [])
-        rows = self.read_state()
-        self.assertEqual([r['status'] for r in rows], ['pending', 'pending'])
-        self.assertEqual({r['error'] for r in rows}, {'access check failed: HTTP 401'})
+        self.assertEqual(self.call_summary(), [('GET', 'list')])
+        # The file is left untouched: no state columns, no backup.
+        self.assertNotIn('status', self.read_state()[0])
+        self.assertEqual(glob.glob('*.bak') + glob.glob('upload/*.bak'), [])
 
     def test_create_failure_stops_further_calls_for_that_entry(self):
         self.fake.fail_create = 400
@@ -164,7 +167,7 @@ class TestUploadFailures(WorkspaceTestCase):
 
         self.assertEqual(
             self.call_summary(),
-            [('GET', 'list'), ('POST', 'create'), ('GET', 'list'), ('POST', 'create')],
+            [('GET', 'list'), ('POST', 'create'), ('POST', 'create')],
         )
         self.assertEqual(self.done_rows(), [])
 
