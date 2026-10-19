@@ -37,14 +37,14 @@ CONFERENCE_TOML = (
     "CONFERENCE_DATES = '23 June - 26 June, 2026'\n"
     "CONFERENCE_TITLE = 'Example Conference on Sound'\n"
     "CONFERENCE_ACRONYM = 'EXC'\n"
-    "CONFERENCE_URL = 'https://example.org'\n"
+    "CONFERENCE_URL = 'https://exc.test/'\n"
     "ZENODO_COMMUNITY = 'example_community'\n"
     "LICENSE = 'cc-by-4.0'\n"
     "ACCESS_RIGHT = 'open'\n"
     "PUBLISHER = 'Example Publisher'\n"
     "CONFERENCE_PLACE = 'Example City, Country'\n"
     "PROCEEDINGS_TITLE = 'Proceedings of the Example Conference on Sound'\n"
-    "ISBN = '978-0-0000-0000-0'\n"
+    "ISBN = '978-0-306-40615-7'\n"
     "ISSN = '0000-0000'\n"
 )
 

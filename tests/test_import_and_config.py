@@ -85,7 +85,7 @@ class TestConfiguration(WorkspaceTestCase):
         self.assertEqual(self.app.CONFERENCE_ACRONYM, 'EXC')
         self.assertEqual(self.app.CONFERENCE_TITLE, 'Example Conference on Sound')
         self.assertTrue(self.app.CONFERENCE_DATES)
-        self.assertEqual(self.app.CONFERENCE_URL, 'https://example.org')
+        self.assertEqual(self.app.CONFERENCE_URL, 'https://exc.test/')
         self.assertEqual(self.app.ZENODO_COMMUNITY, 'example_community')
 
     def test_state_columns_and_stages(self):

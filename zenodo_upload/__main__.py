@@ -45,6 +45,7 @@ if __package__ in (None, ''):
     # Started as `python zenodo_upload`: make the package importable by its absolute name.
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from zenodo_upload.config import ConfigError, validate_conference
 from zenodo_upload.console import secho
 from zenodo_upload.metadata import Conference
 from zenodo_upload.rows import CsvError, STAGES, STATE_COLUMNS, read_rows
@@ -140,11 +141,12 @@ def main(argv=None):
 
     args = cli.parse_args(argv)
     try:
+        validate_conference(CONFERENCE)
         if args.command == 'upload':
             failed = upload(args.csvfile, args.production)
         else:
             failed = check(args.csvfile, args.authors)
-    except CsvError as error:
+    except (ConfigError, CsvError) as error:
         secho(str(error), fg='red')
         sys.exit(1)
     if failed:

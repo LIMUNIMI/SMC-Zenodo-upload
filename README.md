@@ -230,6 +230,13 @@ ISBN = 'XXX-X-XXXXX-XXX-X'
 ISSN = ''
 ```
 
+Every command (`check` included) first validates these values and stops
+before doing anything if they are unusable: the placeholders shown above
+(date, URL, place, ISBN) are rejected, `PUBLICATION_DATE` must be a real
+`YYYY-MM-DD` date, `ISBN` must be a valid ISBN-10 or ISBN-13, `ISSN` (if
+given) must look like `1234-5678`, and `ACCESS_RIGHT` must be one of
+`open`, `embargoed`, `restricted`, `closed`.
+
 `ZENODO_COMMUNITY` is the identifier of the Zenodo community the records
 are added to, i.e. the last part of its URL
 (`https://zenodo.org/communities/smc/`). `LICENSE` is the Zenodo licence

@@ -30,7 +30,7 @@ class TestMetadataMapping(WorkspaceTestCase):
         self.assertEqual(md['upload_type'], 'publication')
         self.assertEqual(md['publication_type'], 'conferencepaper')
         self.assertEqual(md['description'], 'An abstract.')
-        self.assertEqual(md['conference_url'], 'https://example.org')
+        self.assertEqual(md['conference_url'], 'https://exc.test/')
         self.assertEqual(md['partof_pages'], '10--15')
         self.assertEqual(md['conference_session'], 'Paper Session 2')
         self.assertEqual(md['communities'], [{'identifier': 'example_community'}])
@@ -50,7 +50,7 @@ class TestMetadataMapping(WorkspaceTestCase):
         self.assertEqual(md['conference_place'], 'Example City, Country')
         self.assertEqual(md['partof_title'], 'Proceedings of the Example Conference on Sound')
         self.assertEqual(md['imprint_title'], md['partof_title'])
-        self.assertEqual(md['imprint_isbn'], '978-0-0000-0000-0')
+        self.assertEqual(md['imprint_isbn'], '978-0-306-40615-7')
         self.assertEqual(md['imprint_issn'], '0000-0000')
         self.assertRegex(md['publication_date'], r'^\d{4}-\d{2}-\d{2}$')
         # The date comes from the configuration, never from the rows.
@@ -94,7 +94,7 @@ class TestMetadataMapping(WorkspaceTestCase):
 
         self.assertEqual(md['conference_place'], 'Example City, Country')
         self.assertEqual(md['partof_title'], 'Proceedings of the Example Conference on Sound')
-        self.assertEqual(md['imprint_isbn'], '978-0-0000-0000-0')
+        self.assertEqual(md['imprint_isbn'], '978-0-306-40615-7')
         self.assertEqual(md['imprint_issn'], '0000-0000')
 
     def test_issn_is_left_out_when_the_proceedings_have_none(self):
