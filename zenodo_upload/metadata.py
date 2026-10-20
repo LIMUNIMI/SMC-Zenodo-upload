@@ -18,7 +18,7 @@ class Conference(NamedTuple):
     publisher: str
     place: str
     proceedings_title: str
-    isbn: str
+    isbn: str  # empty when not known yet
     issn: str  # empty when the proceedings have none
 
 
@@ -53,10 +53,12 @@ def build_deposition(row, conference):
             'communities': [{'identifier': conference.community}],  # the conference's community
             'license': conference.license,
             'access_right': conference.access_right,
-            'imprint_publisher': conference.publisher,
-            'imprint_isbn': conference.isbn
+            'imprint_publisher': conference.publisher
         }
     }
+
+    if conference.isbn:
+        data['metadata']['imprint_isbn'] = conference.isbn
 
     if conference.issn:
         data['metadata']['imprint_issn'] = conference.issn

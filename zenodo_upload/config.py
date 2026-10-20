@@ -10,6 +10,7 @@ from zenodo_upload.zenodo import SERVERS
 ACCESS_RIGHTS = ('open', 'embargoed', 'restricted', 'closed')
 PLACEHOLDER_HOSTS = ('example.org', 'example.com')
 PLACEHOLDER_PLACE = 'City, Country'
+ISBN_PLACEHOLDER = 'XXX-X-XXXXX-XXX-X'  # in conference.toml it means: no ISBN yet
 
 # Conference fields that are named differently in conference.toml
 KEYS = {
@@ -26,7 +27,7 @@ def validate_conference(conference):
     """Raise ConfigError if a `metadata.Conference` still has placeholder or malformed values."""
     problems = []
     for name, value in conference._asdict().items():
-        if not value and name != 'issn':
+        if not value and name not in ('isbn', 'issn'):  # these two are optional
             problems.append(f"{KEYS.get(name, name.upper())} is empty")
 
     if conference.publication_date:

@@ -282,11 +282,13 @@ ISBN = 'XXX-X-XXXXX-XXX-X'
 ISSN = ''
 ```
 
+`ISBN` and `ISSN` are optional (see below).
+
 Every command (`check` included) first validates these values and stops
 before doing anything if they are unusable: the placeholders shown above
-(date, URL, place, ISBN) are rejected, `PUBLICATION_DATE` must be a real
-`YYYY-MM-DD` date, `ISBN` must be a valid ISBN-10 or ISBN-13, `ISSN` (if
-given) must look like `1234-5678`, and `ACCESS_RIGHT` must be one of
+(date, URL, place) are rejected, `PUBLICATION_DATE` must be a real
+`YYYY-MM-DD` date, `ISBN` (if given) must be a valid ISBN-10 or ISBN-13,
+`ISSN` (if given) must look like `1234-5678`, and `ACCESS_RIGHT` must be one of
 `open`, `embargoed`, `restricted`, `closed`.
 
 `ZENODO_COMMUNITY` is the identifier of the Zenodo community the records
@@ -296,9 +298,14 @@ identifier and must match the licence printed on the paper template;
 `ACCESS_RIGHT` is `open` for public records; `PUBLISHER` is shown as the
 record's publisher. `CONFERENCE_PLACE`, `PROCEEDINGS_TITLE`, `ISBN` and
 `ISSN` are the same for all papers, so they are not read from the CSV
-file. All records are required except `ISSN`, which can be left empty (no
-ISSN is sent then). Note that Zenodo's deposit API has no ISSN field: the
-value is accepted but not stored in the record (checked on the sandbox).
+file. All records are required except `ISBN` and `ISSN`: they can be
+left empty or left out (no value is sent then), and for the ISBN the
+placeholder `XXX-X-XXXXX-XXX-X` counts as empty, so you can keep it until
+the ISBN is known. `upload` and `publish` remind you when it is missing;
+this program does not update records that are already published, so an
+ISBN obtained later has to be added by editing the records on Zenodo.
+Note that Zenodo's deposit API has no ISSN field: the value is accepted
+but not stored in the record (checked on the sandbox).
 
 ## Additional files
 

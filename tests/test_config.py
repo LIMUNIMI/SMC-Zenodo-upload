@@ -1,6 +1,6 @@
 import unittest
 
-from tests.support import WorkspaceTestCase, csv_row
+from tests.support import CONFERENCE_TOML, WorkspaceTestCase, csv_row
 
 
 class TestConferenceValidation(WorkspaceTestCase):
@@ -35,10 +35,31 @@ class TestConferenceValidation(WorkspaceTestCase):
             with self.subTest(value=value):
                 self.assertRejected(self.run_with(url=value), 'CONFERENCE_URL')
 
-    def test_isbn_is_required_and_checked(self):
-        for value in ('', 'XXX-X-XXXXX-XXX-X', '978-0-306-40615-8'):
+    def test_isbn_may_be_empty_but_not_malformed(self):
+        self.assertEqual(self.run_with(isbn='').exit_code, 0)
+        for value in ('978-0-306-40615-8', 'XXX-X-XXXXX', '12345'):
             with self.subTest(value=value):
                 self.assertRejected(self.run_with(isbn=value), 'ISBN')
+
+    def test_isbn_placeholder_in_the_file_means_no_isbn(self):
+        with open('conference.toml', 'w') as f:
+            f.write(CONFERENCE_TOML.replace(
+                "ISBN = '978-0-306-40615-7'", "ISBN = 'XXX-X-XXXXX-XXX-X'"
+            ))
+        self.reload_app()
+
+        result = self.run_check(self.csv)
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(self.app.CONFERENCE.isbn, '')
+
+    def test_isbn_may_be_left_out_of_the_file(self):
+        with open('conference.toml', 'w') as f:
+            f.write(CONFERENCE_TOML.replace("ISBN = '978-0-306-40615-7'\n", ''))
+        self.reload_app()
+
+        self.assertEqual(self.run_check(self.csv).exit_code, 0)
+        self.assertEqual(self.app.CONFERENCE.isbn, '')
 
     def test_isbn_10_and_13_are_accepted(self):
         for value in ('0-306-40615-2', '9780306406157', '978 0 306 40615 7'):
@@ -63,7 +84,7 @@ class TestConferenceValidation(WorkspaceTestCase):
                 self.assertRejected(self.run_with(**{name: ''}), f'{key} is empty')
 
     def test_all_problems_are_listed_together(self):
-        result = self.run_with(publication_date='YYYY-MM-DD', isbn='')
+        result = self.run_with(publication_date='YYYY-MM-DD', isbn='12345')
 
         self.assertRejected(result, 'PUBLICATION_DATE')
         self.assertIn('ISBN', result.output)

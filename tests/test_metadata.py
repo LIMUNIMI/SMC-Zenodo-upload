@@ -104,6 +104,13 @@ class TestMetadataMapping(WorkspaceTestCase):
 
         self.assertNotIn('imprint_issn', md)
 
+    def test_isbn_is_left_out_when_not_known_yet(self):
+        from zenodo_upload.metadata import build_deposition
+
+        md = build_deposition(csv_row(), self.app.CONFERENCE._replace(isbn=''))['metadata']
+
+        self.assertNotIn('imprint_isbn', md)
+
     def test_values_are_stripped(self):
         md = self.upload_one(title='  Padded  ')
 

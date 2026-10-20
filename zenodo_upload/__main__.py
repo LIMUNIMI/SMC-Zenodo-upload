@@ -45,7 +45,7 @@ if __package__ in (None, ''):
     # Started as `python zenodo_upload`: make the package importable by its absolute name.
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from zenodo_upload.config import ConfigError, load_secrets, validate_conference
+from zenodo_upload.config import ISBN_PLACEHOLDER, ConfigError, load_secrets, validate_conference
 from zenodo_upload.console import secho
 from zenodo_upload.metadata import Conference
 from zenodo_upload.rows import CsvError, STAGES, STATE_COLUMNS, read_rows
@@ -67,7 +67,9 @@ ACCESS_RIGHT = conference_data['ACCESS_RIGHT']
 PUBLISHER = conference_data['PUBLISHER']
 CONFERENCE_PLACE = conference_data['CONFERENCE_PLACE']
 PROCEEDINGS_TITLE = conference_data['PROCEEDINGS_TITLE']
-ISBN = conference_data['ISBN']
+ISBN = conference_data.get('ISBN', '')
+if ISBN == ISBN_PLACEHOLDER:
+    ISBN = ''  # not known yet
 ISSN = conference_data.get('ISSN', '')
 CONFERENCE = Conference(
     PUBLICATION_DATE, CONFERENCE_DATES, CONFERENCE_TITLE, CONFERENCE_ACRONYM, CONFERENCE_URL,
@@ -100,6 +102,12 @@ def _send(csvfile, production, action):
         secho(
             f"You are {verb} to the sandbox Zenodo server! Test here as much as you want.",
             fg="green"
+        )
+    if not CONFERENCE.isbn:
+        secho(
+            "No ISBN set in conference.toml: the records will have none "
+            "(it can be added later by editing them on Zenodo).",
+            fg="yellow"
         )
     input("Press Enter to continue or Ctrl-C to abort.")
     return process_csv(

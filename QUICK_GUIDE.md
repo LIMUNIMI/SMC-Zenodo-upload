@@ -61,7 +61,7 @@ Create a sandbox community:
 - Open [conference.toml](conference.toml) and fill in all the fields (see [Conference Metadata](README.md#conference-metadata)). Ask the conference board if you are missing some information:
 	- `PUBLICATION_DATE`, `CONFERENCE_DATES`, `CONFERENCE_PLACE`
 	- `CONFERENCE_TITLE`, `CONFERENCE_ACRONYM`, `CONFERENCE_URL`
-	- `PROCEEDINGS_TITLE`, `ISBN`, `ISSN` (optional), `PUBLISHER`
+	- `PROCEEDINGS_TITLE`, `ISBN` (optional, can be added later by editing the published records), `ISSN` (optional), `PUBLISHER`
 	- `LICENSE`, `ACCESS_RIGHT`, `ZENODO_COMMUNITY`
 
 ## 2. Run the script

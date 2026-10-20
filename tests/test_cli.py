@@ -25,6 +25,18 @@ class TestUploadCommand(WorkspaceTestCase):
         self.assertIn('WARNING', result.output)
         self.assertIn('production Zenodo server', result.output)
 
+    def test_missing_isbn_is_announced_before_the_prompt(self):
+        self.app.CONFERENCE = self.app.CONFERENCE._replace(isbn='')
+
+        result = self.run_upload(self.bib)
+
+        self.assertIn('No ISBN set', result.output)
+
+    def test_no_isbn_notice_when_the_isbn_is_set(self):
+        result = self.run_upload(self.bib)
+
+        self.assertNotIn('No ISBN', result.output)
+
     def test_user_must_confirm_with_enter_before_upload(self):
         with mock.patch('builtins.input', side_effect=KeyboardInterrupt) as prompt:
             result = self.run_cli('upload', self.bib)
